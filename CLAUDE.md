@@ -12,7 +12,7 @@ Claude Code auto-loads this file when the session cwd is in this repo (per the "
 ## Claude-specific deltas
 
 - **Forge auto-include** (from the global rules): coding tasks at effort E3+ get a parallel Forge agent. That applies in this repo too. Forge writes code; Engineer agent works the same surface from the Claude-family side.
-- **Interceptor for any UI verification**. When confirming a deploy or fix on `https://assist.tail15d8ef.ts.net:8443/`, use the Interceptor skill (real Chrome) — agent-browser CDP fingerprints differently and misses rendering issues real Chrome catches.
+- **Interceptor for any UI verification**. When confirming a deploy or fix against the running instance (local `http://127.0.0.1:4321` or the operator's tailnet endpoint — never name the tailnet URL in repo-tracked files), use the Interceptor skill (real Chrome) rather than agent-browser (CDP fingerprints differently and misses rendering issues real Chrome catches). The endpoint itself is operator-configured and lives in the operator's session, not in repo.
 - **Voice notifications**: defer to the global rule. CMDB-related notifications use the standard Daryl voice (`TX3LPaxmHKxFdv7VOQHJ`); no repo-specific override.
 
 ## When in doubt

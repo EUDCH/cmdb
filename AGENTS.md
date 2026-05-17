@@ -41,7 +41,7 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 
 ## Code style
 
-- **TypeScript everywhere**. No JavaScript files except generated config (`.astro/`).
+- **TypeScript everywhere** for application + test code. The only JS files in the repo are framework-imposed: `astro.config.mjs` at the root (Astro convention; the loader treats `.mjs` differently from `.ts`) and generated files under `.astro/`. Any new script or module goes in TypeScript.
 - **No Python**. If a task seems to need a script, write it in TypeScript and run with `bun run script.ts`.
 - **Path aliases**: `~/` resolves to `src/`, `@db/` resolves to `db/` (see `tsconfig.json`). Use the alias, not a relative `../../../`.
 - **Module imports**: ESM only (`"type": "module"` in `package.json`); no `require()`.
@@ -74,16 +74,16 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 2. **Library unit tests** — `src/lib/*` (db queries, session, auth helpers). Fast, no infra.
 3. **End-to-end browser tests** — only once the HTMX-driven interactive paths exist; not warranted while pages are read-only.
 
-The `test` CI job spins up Postgres via GitHub Actions `services:` (matches the `postgres:17-alpine` image used by `docker-compose.yml` for local dev). The `docker-compose.yml` stays the local-dev path; GHA `services:` is the CI path because it's materially simpler (no compose orchestration in CI).
+**Principle, not exact CI shape:** integration tests need a real Postgres in CI (mocking the DB defeats the point of the route-integration tier). The current concrete shape lives in `.github/workflows/ci.yml` — read that for the exact image, env vars, and step sequence. Local dev uses `docker-compose.yml`; CI uses whatever is simplest there (GitHub Actions `services:` at time of writing). When the concrete shape changes, update the workflow — this file stays principle-level so it doesn't go stale on every infra tweak.
 
-Test data lives in `tests/setup-db.ts` — a deterministic minimal fixture, decoupled from `db/seed.ts` (demo data) so assertions stay stable as the demo grows.
+**Test data:** fixtures used by integration tests live under `tests/` (separate from `db/seed.ts`, which is the demo seed shipped in the repo). Keep test fixtures minimal and deterministic so assertions stay stable as the demo seed grows.
 
 ## Security & secrets
 
 - **Never commit secrets**. The CI `secrets` job runs `gitleaks` against the full history; a failure blocks merge.
 - **Never push real inventory data**. `db/seed.local.ts` carries the real EDCH inventory and is gitignored; `db/seed.ts` carries demo data only. If you add real data to a public file by accident, surface it immediately so the history can be rewritten before the leak ages.
 - **All URLs in fixtures and demo data** use the `.example.invalid` TLD (RFC 2606). Don't write real customer URLs into tests.
-- **CI runs `AUTH_MODE=dev`** with placeholder `SESSION_SECRET` and `DATABASE_URL`; production secrets never enter CI. If you add code that throws at module-import without an env var, supply a structural placeholder in `.github/workflows/ci.yml` (see the `build` job's env block for the pattern).
+- **CI runs `AUTH_MODE=dev`** with structural placeholder `SESSION_SECRET` and `DATABASE_URL` values inlined in `.github/workflows/ci.yml` (no `${{ secrets.* }}` references in the build env — production secrets never enter CI by construction). If you add code that throws at module-import without an env var, supply a structural placeholder in the workflow (see the `build` job's env block for the pattern). Don't introduce a `${{ secrets.* }}` fallback "just in case" — that turns the absence-of-secret into a silent footgun.
 
 ## Linters and formatters
 
@@ -92,7 +92,21 @@ Test data lives in `tests/setup-db.ts` — a deterministic minimal fixture, deco
 - **TypeScript** — `bun run check` (Astro check) + `bun run typecheck` (tsc `--noEmit`). Both must be clean.
 - **Dockerfile** — hadolint via `.github/workflows/ci.yml` (no local config).
 
-Before pushing, run `bun run check && bun run typecheck && bun test` to mirror what CI will run.
+Before pushing, run the Bun-based subset locally:
+
+```sh
+bun run check && bun run typecheck && bun test
+```
+
+This catches TS/Astro/test errors but does **not** mirror the full CI run. To check the remaining lint steps locally before pushing:
+
+```sh
+bun x markdownlint-cli2                # markdown lint (uses .markdownlint-cli2.yaml)
+bun x yamllint .                       # yaml lint   (uses .yamllint.yml; requires `pip install yamllint` once)
+docker run --rm -i hadolint/hadolint < Dockerfile   # Dockerfile lint
+```
+
+The `secrets` CI job runs `gitleaks` against the full git history — there's no fast local equivalent worth running every push; rely on CI for that gate.
 
 ## Anti-patterns to avoid
 
