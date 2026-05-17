@@ -33,6 +33,18 @@ try {
 }
 
 if (!serverReachable) {
+  // In CI, an unreachable server means the workflow's start-server step
+  // produced something that doesn't accept TCP — that's a real failure
+  // worth surfacing loudly, not a silent skip. Throwing at module-import
+  // time aborts the suite with a non-zero exit and shows up in the CI
+  // log instead of disguising itself as a green "skipped" run.
+  if (process.env.CI === "true") {
+    throw new Error(
+      `Integration tests cannot reach the SSR server at ${BASE_URL}.\n` +
+        `CI must always have the server up before this suite runs — refusing to skip.\n` +
+        `Check the workflow's "Start server" / "Wait for server" steps.`,
+    );
+  }
   console.warn(
     `\n[skip] Integration tests need the SSR server at ${BASE_URL}.\n` +
       `       Bring it up locally with the steps in AGENTS.md → Running integration tests locally.\n` +

@@ -11,7 +11,7 @@
  * find yourself adding rows just to make an assertion pass, the assertion
  * is testing the wrong thing.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
 
@@ -19,6 +19,25 @@ const url = process.env.DATABASE_URL;
 if (!url) {
   console.error("DATABASE_URL not set");
   process.exit(1);
+}
+
+/**
+ * Strip any embedded credentials from a Postgres URL before logging it,
+ * so a safety-guard refusal doesn't leak a password into CI logs or
+ * pasted output. Falls back to "<unparseable URL>" if the URL doesn't
+ * parse cleanly.
+ */
+function redactUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    if (u.username || u.password) {
+      u.username = "***";
+      u.password = "***";
+    }
+    return u.toString();
+  } catch {
+    return "<unparseable URL>";
+  }
 }
 
 // Safety guard — this script DROPs the public schema. The target database
@@ -39,7 +58,7 @@ const explicitOverride = process.env.CMDB_ALLOW_DESTRUCTIVE_RESET === "1";
 
 if (!looksLikeTestDb && !explicitOverride) {
   console.error(
-    `Refusing to reset schema on DATABASE_URL=${url}\n` +
+    `Refusing to reset schema on DATABASE_URL=${redactUrl(url)}\n` +
       `  - database name "${dbName}" does not match /^[a-z][a-z0-9_]*_(test|ci)$/i\n` +
       `  - CMDB_ALLOW_DESTRUCTIVE_RESET is not "1"\n` +
       `\n` +
@@ -66,10 +85,23 @@ async function main() {
   console.log("Resetting schema…");
   await sql.unsafe("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;");
 
-  console.log("Applying migration 0001…");
-  const migrationPath = join(import.meta.dir, "..", "migrations", "0001_init.sql");
-  const migration = readFileSync(migrationPath, "utf8");
-  await sql.unsafe(migration);
+  // Apply every migration in `migrations/` in lexicographic order, so the
+  // test DB stays aligned with whatever schema production runs. Hardcoding
+  // `0001_init.sql` would silently let the test DB lag once migration 0002
+  // landed, and route tests could pass against a stale schema.
+  const migrationsDir = join(import.meta.dir, "..", "migrations");
+  const migrationFiles = readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+  if (migrationFiles.length === 0) {
+    console.error(`No *.sql files found in ${migrationsDir}`);
+    process.exit(1);
+  }
+  for (const file of migrationFiles) {
+    console.log(`Applying migration ${file}…`);
+    const migration = readFileSync(join(migrationsDir, file), "utf8");
+    await sql.unsafe(migration);
+  }
 
   console.log("Inserting test fixture…");
   await sql`
