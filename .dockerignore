@@ -1,0 +1,15 @@
+.git
+.github
+.astro
+.env
+.env.*
+!.env.example
+node_modules
+dist
+**/*.log
+README.md
+docs
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml

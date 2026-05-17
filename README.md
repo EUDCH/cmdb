@@ -19,27 +19,40 @@ Currently in design phase — no code yet. See `docs/` for architecture and deci
 
 ## Quickstart
 
-Requirements: Bun, PostgreSQL.
+Requirements: Bun, Docker (Compose v2).
 
 ```fish
-# 1. Install deps
+# 1. Install deps + seed env
 bun install
-
-# 2. Bring up a local Postgres (any method works — direct install, docker, etc.)
-#    Then copy .env.example to .env and fill in DATABASE_URL.
 cp .env.example .env
-$EDITOR .env
 
-# 3. Apply the initial migration (raw SQL — namespace ENUM, tables, indexes, triggers).
-psql "$DATABASE_URL" -f migrations/0001_init.sql
+# 2. Bring up Postgres — migration 0001 auto-applies on first boot.
+docker compose up -d
 
-# 4. Run the dev server.
+# 3. Run the dev server natively against the containerised DB.
 bun run dev
 ```
 
 Visit `http://127.0.0.1:4321` — the Services and Hosts pages render empty tables until rows are inserted. The HTMX CDN tag is wired in the base layout for the interactive bits that arrive in subsequent iterations.
 
-Drizzle Studio (`bun run db:studio`) opens a browser-based DB inspector against the same `DATABASE_URL` once `bun install` has fetched `drizzle-kit`.
+### Full-stack containerised test
+
+```fish
+docker compose --profile app up -d --build
+```
+
+Builds the multi-stage Bun + Astro image and starts the app at `http://127.0.0.1:4321` against the containerised Postgres. Useful for verifying production wiring; the dev-server hot-reload path stays via `bun run dev`.
+
+### Reset the DB
+
+```fish
+docker compose down -v      # drops the named volume cmdb-pgdata
+docker compose up -d        # migration replays on the fresh volume
+```
+
+### Schema inspection
+
+`bun run db:studio` opens Drizzle Studio against `DATABASE_URL`. `psql "$DATABASE_URL"` works for raw SQL inspection.
 
 ## Documents
 
