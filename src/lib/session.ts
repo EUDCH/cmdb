@@ -23,12 +23,12 @@ function sign(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("base64url");
 }
 
-export function encodeSession(session: Session): string {
-  const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
+export function signPayload<T>(value: T): string {
+  const payload = Buffer.from(JSON.stringify(value)).toString("base64url");
   return `${payload}.${sign(payload)}`;
 }
 
-export function decodeSession(cookie: string | undefined): Session | null {
+export function verifyPayload<T>(cookie: string | undefined): T | null {
   if (!cookie) return null;
   const dot = cookie.indexOf(".");
   if (dot <= 0) return null;
@@ -39,12 +39,21 @@ export function decodeSession(cookie: string | undefined): Session | null {
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
-    const session = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Session;
-    if (typeof session.expiresAt !== "number" || session.expiresAt < Date.now()) return null;
-    return session;
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as T;
   } catch {
     return null;
   }
+}
+
+export function encodeSession(session: Session): string {
+  return signPayload(session);
+}
+
+export function decodeSession(cookie: string | undefined): Session | null {
+  const session = verifyPayload<Session>(cookie);
+  if (!session) return null;
+  if (typeof session.expiresAt !== "number" || session.expiresAt < Date.now()) return null;
+  return session;
 }
 
 export function makeSession(claims: {

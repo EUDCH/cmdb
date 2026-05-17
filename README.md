@@ -54,6 +54,25 @@ docker compose up -d        # migration replays on the fresh volume
 
 `bun run db:studio` opens Drizzle Studio against `DATABASE_URL`. `psql "$DATABASE_URL"` works for raw SQL inspection.
 
+### Auth
+
+The app is gated by middleware. Two modes (see [`docs/adr/0003-auth.md`](docs/adr/0003-auth.md)):
+
+- **`AUTH_MODE=dev`** — middleware short-circuits with a hardcoded dev user and a red `DEV AUTH — NO PRODUCTION USE` banner. Use this for stack-up testing before OPERAS ID has the client registered. `.env.example` ships with this default so the Quickstart works out of the box.
+- **`AUTH_MODE=oidc`** — full OIDC + PKCE against OPERAS ID. Requires:
+
+  ```
+  OIDC_ISSUER_URL=https://id.operas-eu.org
+  OIDC_CLIENT_ID=...
+  OIDC_CLIENT_SECRET=...
+  OIDC_REDIRECT_URI=https://cmdb.example.org/auth/callback
+  SESSION_SECRET=$(openssl rand -base64 48)
+  ```
+
+  `OIDC_REDIRECT_URI` must match the app-facing URL exactly. `SESSION_SECRET` must be at least 32 bytes.
+
+Routes: `/auth/login`, `/auth/callback`, `/auth/logout`. Sessions live in an HMAC-signed `HttpOnly` cookie with a 12 h TTL.
+
 ## Documents
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — high-level architecture, data model overview, integration points
