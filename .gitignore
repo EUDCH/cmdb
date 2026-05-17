@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Astro build artefacts and generated types
+.astro/
+
+# Keep .env.example tracked, ignore the rest of .env*
+!.env.example

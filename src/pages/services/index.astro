@@ -1,0 +1,36 @@
+---
+import Base from "~/layouts/Base.astro";
+import { db } from "~/lib/db";
+import { service } from "@db/schema";
+
+const rows = await db.select().from(service);
+---
+<Base title="Services">
+  <h2>Services</h2>
+  <p class="muted">{rows.length} service{rows.length === 1 ? "" : "s"} in inventory.</p>
+
+  {rows.length === 0 ? (
+    <p>No services yet. Add one via the API (UI form arrives in a later iteration).</p>
+  ) : (
+    <table>
+      <thead>
+        <tr>
+          <th>Namespace</th>
+          <th>Name</th>
+          <th>Lifecycle</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((s) => (
+          <tr>
+            <td><span class="pill">{s.namespace}</span></td>
+            <td>{s.name}</td>
+            <td>{s.lifecycleState}</td>
+            <td class="muted">{s.description ?? ""}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</Base>
