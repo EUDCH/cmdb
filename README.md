@@ -17,6 +17,30 @@ Currently in design phase — no code yet. See `docs/` for architecture and deci
 | Deployment target | Example PaaS (likely) |
 | Repo location | EUDCH org for now, may move to OPERAS org for v2 |
 
+## Quickstart
+
+Requirements: Bun, PostgreSQL.
+
+```fish
+# 1. Install deps
+bun install
+
+# 2. Bring up a local Postgres (any method works — direct install, docker, etc.)
+#    Then copy .env.example to .env and fill in DATABASE_URL.
+cp .env.example .env
+$EDITOR .env
+
+# 3. Apply the initial migration (raw SQL — namespace ENUM, tables, indexes, triggers).
+psql "$DATABASE_URL" -f migrations/0001_init.sql
+
+# 4. Run the dev server.
+bun run dev
+```
+
+Visit `http://127.0.0.1:4321` — the Services and Hosts pages render empty tables until rows are inserted. The HTMX CDN tag is wired in the base layout for the interactive bits that arrive in subsequent iterations.
+
+Drizzle Studio (`bun run db:studio`) opens a browser-based DB inspector against the same `DATABASE_URL` once `bun install` has fetched `drizzle-kit`.
+
 ## Documents
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — high-level architecture, data model overview, integration points
