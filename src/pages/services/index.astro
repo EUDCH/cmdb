@@ -26,7 +26,7 @@ const rows = await db.select().from(service);
           <tr>
             <td><span class="pill">{s.namespace}</span></td>
             <td>{s.name}</td>
-            <td>{s.lifecycleState}</td>
+            <td><span class={`pill-lifecycle ${s.lifecycleState}`}>{s.lifecycleState}</span></td>
             <td class="muted">{s.description ?? ""}</td>
           </tr>
         ))}

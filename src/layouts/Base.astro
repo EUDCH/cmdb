@@ -12,32 +12,127 @@ const session = Astro.locals.session;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#355BA9" />
     <title>{title} — EDCH CMDB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap"
+    />
     <script is:inline src="https://unpkg.com/htmx.org@2.0.4" defer></script>
     <style>
       :root {
+        /* EDCH brand palette (per Athina's brand sheet) */
+        --edch-blue:   #355BA9;  /* primary — Forum & Registry */
+        --edch-violet: #8475B6;
+        --edch-pink:   #F05D89;
+        --edch-amber:  #FCB316;
+        --edch-lime:   #87C540;
+        --edch-teal:   #00A666;
+        --edch-red:    #EF4136;
+        --edch-orange: #F47721;
+        --edch-cyan:   #16C1F3;
+
         --fg: #1a1a1a;
-        --bg: #fafafa;
-        --accent: #2a4d8f;
-        --muted: #6b6b6b;
-        --border: #d4d4d4;
-        font-family: system-ui, -apple-system, sans-serif;
+        --bg: #f5f7fb;
+        --surface: #ffffff;
+        --accent: var(--edch-blue);
+        --accent-soft: #e6ecf6;
+        --muted: #5e6677;
+        --border: #d8dee8;
+
+        font-family: "Barlow", system-ui, -apple-system, "Helvetica Neue", sans-serif;
       }
       * { box-sizing: border-box; }
-      body { margin: 0; color: var(--fg); background: var(--bg); }
-      header { background: white; border-bottom: 1px solid var(--border); padding: 1rem 2rem; }
-      header h1 { margin: 0; font-size: 1.25rem; color: var(--accent); }
+      body { margin: 0; color: var(--fg); background: var(--bg); font-weight: 400; }
+      h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.01em; }
+
+      header {
+        background: var(--surface);
+        border-bottom: 3px solid var(--accent);
+        padding: 1rem 2rem;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 1.4rem;
+        color: var(--accent);
+        letter-spacing: 0.02em;
+      }
       header nav { margin-top: 0.5rem; }
-      header nav a { color: var(--fg); margin-right: 1rem; text-decoration: none; }
+      header nav a {
+        color: var(--fg);
+        margin-right: 1.25rem;
+        text-decoration: none;
+        font-weight: 500;
+      }
       header nav a:hover { color: var(--accent); }
+
       main { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+      h2 { color: var(--accent); margin-top: 0; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      thead { background: var(--accent-soft); }
+      th {
+        text-align: left;
+        padding: 0.65rem 0.85rem;
+        font-weight: 600;
+        color: var(--accent);
+        border-bottom: 1px solid var(--border);
+      }
+      td {
+        text-align: left;
+        padding: 0.6rem 0.85rem;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:last-child td { border-bottom: 0; }
+
       .muted { color: var(--muted); }
-      .pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; background: #e8edf6; color: var(--accent); font-size: 0.85rem; }
-      .dev-auth-banner { background: #b00020; color: white; padding: 0.5rem 1rem; text-align: center; font-weight: 700; letter-spacing: 0.05em; }
+
+      .pill {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      /* Lifecycle-state pills — colours mapped from EDCH brand accents. */
+      .pill-lifecycle {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: white;
+      }
+      .pill-lifecycle.planned    { background: var(--edch-violet); }
+      .pill-lifecycle.staging    { background: var(--edch-amber); color: #1a1a1a; }
+      .pill-lifecycle.production { background: var(--edch-teal); }
+      .pill-lifecycle.deprecated { background: var(--edch-orange); }
+      .pill-lifecycle.retired    { background: var(--muted); }
+
+      .dev-auth-banner {
+        background: var(--edch-red);
+        color: white;
+        padding: 0.5rem 1rem;
+        text-align: center;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+
       header .session { float: right; font-size: 0.9rem; color: var(--muted); }
-      header .session a { color: var(--accent); margin-left: 0.5rem; }
+      header .session a { color: var(--accent); margin-left: 0.5rem; font-weight: 500; }
     </style>
   </head>
   <body>
