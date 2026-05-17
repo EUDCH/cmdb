@@ -21,29 +21,36 @@ if (!url) {
   process.exit(1);
 }
 
-// Safety guard — this script DROPs the public schema. Without an explicit
-// allow-marker it refuses to run, so a misconfigured local shell (e.g.
-// DATABASE_URL still pointing at the dev `cmdb` database that holds real
-// EDCH inventory) can't accidentally wipe production data. CI runs are
-// auto-approved via the GitHub Actions `CI=true` env var; local runs need
-// either a `cmdb_test`-ish database name, or an explicit
-// CMDB_ALLOW_DESTRUCTIVE_RESET=1 override.
-const isCi = process.env.CI === "true";
+// Safety guard — this script DROPs the public schema. The target database
+// name must explicitly end in `_test` or `_ci` (case-insensitive). No CI
+// bypass: even in CI the workflow must point DATABASE_URL at a *_test or
+// *_ci database, so a misconfigured workflow can't silently wipe a
+// production-shaped DB. The only escape hatch is an explicit
+// CMDB_ALLOW_DESTRUCTIVE_RESET=1 override, intended for one-off recovery
+// scenarios; never set it in normal local or CI flows.
+//
+// Earlier iteration used /test|ci/i which matched names like "capacity"
+// or "incident"; the strict suffix-with-underscore regex below avoids
+// false positives.
+const TEST_DB_NAME = /^[a-z][a-z0-9_]*_(test|ci)$/i;
 const dbName = url.split("/").pop()?.split("?")[0] ?? "";
-const looksLikeTestDb = /test|ci/i.test(dbName);
+const looksLikeTestDb = TEST_DB_NAME.test(dbName);
 const explicitOverride = process.env.CMDB_ALLOW_DESTRUCTIVE_RESET === "1";
 
-if (!isCi && !looksLikeTestDb && !explicitOverride) {
+if (!looksLikeTestDb && !explicitOverride) {
   console.error(
     `Refusing to reset schema on DATABASE_URL=${url}\n` +
-      `  - database name "${dbName}" does not match /test|ci/i\n` +
-      `  - CI env var is not "true"\n` +
+      `  - database name "${dbName}" does not match /^[a-z][a-z0-9_]*_(test|ci)$/i\n` +
       `  - CMDB_ALLOW_DESTRUCTIVE_RESET is not "1"\n` +
       `\n` +
       `For local integration testing, point DATABASE_URL at a dedicated test\n` +
-      `database (e.g. \`postgresql://cmdb:cmdb@localhost:5432/cmdb_test\`).\n` +
+      `database whose name ends in \`_test\` (e.g.\n` +
+      `\`postgresql://cmdb:cmdb@localhost:5432/cmdb_test\`).\n` +
       `Create it once with:\n` +
       `  docker exec cmdb-postgres psql -U cmdb -d cmdb -c "CREATE DATABASE cmdb_test;"\n` +
+      `\n` +
+      `In CI, set the workflow's DATABASE_URL to a *_test or *_ci database\n` +
+      `(see \`.github/workflows/ci.yml\`).\n` +
       `\n` +
       `To override (NOT recommended — will DROP SCHEMA on the target DB):\n` +
       `  CMDB_ALLOW_DESTRUCTIVE_RESET=1 bun run tests/setup-db.ts`,

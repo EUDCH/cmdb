@@ -95,21 +95,31 @@ docker exec cmdb-postgres psql -U cmdb -d cmdb -c "CREATE DATABASE cmdb_test;"
 DATABASE_URL=postgresql://cmdb:cmdb@localhost:5432/cmdb_test \
   bun run tests/setup-db.ts
 
-# 3. Build + start the SSR server in the background against the test DB.
+# 3a. Build the SSR server (foreground — must finish before step 3b).
+#     Note: the build does NOT background. Backgrounding `bun run build &&
+#     bun run start` would background the whole AND-list, so the next
+#     command could fire before build/start has actually backgrounded.
 DATABASE_URL=postgresql://cmdb:cmdb@localhost:5432/cmdb_test \
   AUTH_MODE=dev \
   SESSION_SECRET=local-test-secret-32-bytes-minimum-________ \
-  bun run build && \
+  bun run build
+
+# 3b. Start the SSR server in the background (note the trailing `&` on
+#     this line only — backgrounds just the `start` command).
 DATABASE_URL=postgresql://cmdb:cmdb@localhost:5432/cmdb_test \
   AUTH_MODE=dev \
   SESSION_SECRET=local-test-secret-32-bytes-minimum-________ \
   PORT=4322 bun run start &
 
+# 3c. Wait for the server's TCP port (the suite has its own reachability
+#     probe but a short wait avoids running tests before the server is up).
+until (echo > /dev/tcp/127.0.0.1/4322) 2>/dev/null; do sleep 0.2; done
+
 # 4. Run the suite against the local server.
 TEST_BASE_URL=http://127.0.0.1:4322 bun test
 ```
 
-CI runs the same sequence via the `test` workflow job; the GHA `services: postgres:` block provides the database and `CI=true` auto-approves the destructive reset.
+CI runs an equivalent sequence via the `test` workflow job; the GHA `services: postgres:` block provisions a `cmdb_test` database that the strict safety guard in `tests/setup-db.ts` accepts uniformly with local runs (no CI bypass).
 
 ## Security & secrets
 
