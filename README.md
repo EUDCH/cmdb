@@ -82,7 +82,7 @@ The app is gated by middleware. Two modes (see [`docs/adr/0003-auth.md`](docs/ad
 - **`AUTH_MODE=dev`** — middleware short-circuits with a hardcoded dev user and a red `DEV AUTH — NO PRODUCTION USE` banner. Use this for stack-up testing before OPERAS ID has the client registered. `.env.example` ships with this default so the Quickstart works out of the box.
 - **`AUTH_MODE=oidc`** — full OIDC + PKCE against OPERAS ID. Requires:
 
-  ```
+  ```env
   OIDC_ISSUER_URL=https://id.operas-eu.org
   OIDC_CLIENT_ID=...
   OIDC_CLIENT_SECRET=...

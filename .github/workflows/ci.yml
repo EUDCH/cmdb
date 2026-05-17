@@ -48,9 +48,10 @@ jobs:
       - name: Lint YAML
         uses: ibiqlik/action-yamllint@v3
       - name: Lint Markdown
+        # Globs + ignores live in .markdownlint-cli2.yaml so the action
+        # discovers them via the standard config-file convention; passing
+        # `globs:` here would override that and bypass the ignores list.
         uses: DavidAnson/markdownlint-cli2-action@v17
-        with:
-          globs: "**/*.md"
 
   build:
     name: Build
