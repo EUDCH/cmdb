@@ -51,6 +51,30 @@ docker compose up -d        # migration replays on the fresh volume
 
 `bun run db:studio` opens Drizzle Studio against `DATABASE_URL`. `psql "$DATABASE_URL"` works for raw SQL inspection.
 
+### Seeding
+
+Two seeds, two scopes:
+
+- **`db/seed.ts`** — public, ships in the repo. Contains illustrative demo
+  data only (fictitious owners, hosts, services, URLs ending in
+  `.example.invalid`). Exercises every code path so a fresh clone gets a
+  visibly populated UI on first boot. Run with `bun run db:seed`.
+- **`db/seed.local.ts`** — gitignored. Carries the real operational
+  inventory (real hosts, OKD project names, partner-managed
+  infrastructure, internal contact addresses). Lives only on the
+  deployed instance. Run with `bun run db:seed:local`.
+
+Both seeds use upsert semantics keyed on the natural unique tuple
+(`(namespace, name)` for owners/services, `(namespace, hostname)` for
+hosts, the composite PK on dependencies). Re-running reapplies the
+canonical state — until the edit UI lands and the audit log starts
+capturing manual mutations, at which point the seeds should switch
+to insert-if-missing and never overwrite.
+
+If you fork the repo for a different deployment, copy `db/seed.ts` to
+`db/seed.local.ts` and replace the demo rows with your inventory.
+Never push `db/seed.local.ts`.
+
 ### Auth
 
 The app is gated by middleware. Two modes (see [`docs/adr/0003-auth.md`](docs/adr/0003-auth.md)):

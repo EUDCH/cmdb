@@ -1,18 +1,21 @@
 /**
- * Seed for EDCH services, hosts and dependencies — v0 source of truth.
+ * Public demo seed — fictitious inventory.
  *
  * Run with: `bun run db:seed`
  *
- * Upsert semantics: each row is keyed on its natural unique tuple
- * (owners + services on `(namespace, name)`, hosts on `(namespace, hostname)`,
- * dependencies on `(from_id, to_id, kind)`); existing rows are updated to
- * match this file. The seed is canonical *only* until the edit UI lands and
- * an audit trail starts capturing manual mutations — at that point this
- * script should become insert-if-missing and never overwrite.
+ * This seed ships in the public repo and contains *no* real EDCH operational
+ * data. Service names, hosts, URLs and ownership are illustrative — they
+ * exercise every code path in the model (service / host / dependency /
+ * lifecycle states / brand-component metadata) so a fresh clone gets a
+ * usable demo on first boot.
  *
- * Brand component mapping lives in service.metadata.component and follows
- * Athina's brand sheet (Forum & Registry, Diamond Discovery Hub, Resources
- * & Guidelines, Training Platform, Publishing Tools, Diamond OA Standard).
+ * For the real EDCH inventory, create `db/seed.local.ts` (gitignored)
+ * and run `bun run db:seed:local`. The local seed is the deployed
+ * source of truth on the tailnet instance; the public seed never runs
+ * against production.
+ *
+ * Upsert semantics: each row is keyed on its natural unique tuple and
+ * existing rows are updated to match this file.
  */
 import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -158,194 +161,151 @@ async function ensureDependency(
 
 async function main() {
   // ---- Owners -----------------------------------------------------------
-  const tech = await upsertOwner("EDCH Technical Coordination", "ops@example.invalid");
+  const demoOwner = await upsertOwner("Example Operations Team", "ops@example.invalid");
 
   // ---- Hosts ------------------------------------------------------------
-  const pcss = await upsertHost({
-    hostname: "Example PaaS",
+  const paas = await upsertHost({
+    hostname: "example-paas",
     kind: "external",
-    location: "Example Region (Example PaaS provider)",
+    location: "Example Region (illustrative PaaS provider)",
     notes:
-      "OKD-based PaaS. EDCH project namespace: example-edch-project on example-paas.invalid. " +
-      "Hosts the Drupal-based CAP and Registry services.",
-    metadata: {
-      kind_detail: "okd-paas",
-      okd_cluster: "example-paas.invalid",
-      project_namespace: "example-edch-project",
-    },
+      "Fictitious managed Kubernetes-style platform. Stands in for any partner-" +
+      "operated PaaS in the demo inventory.",
+    metadata: { kind_detail: "managed-paas" },
   });
 
-  const icm = await upsertHost({
-    hostname: "Example Partner",
+  const partnerCloud = await upsertHost({
+    hostname: "example-partner-cloud",
     kind: "external",
-    location: "Example Region (illustrative partner infra)",
-    notes: "Partner-managed infrastructure. Operates the Diamond Discovery Hub.",
+    location: "Example Region (illustrative partner-managed infrastructure)",
+    notes: "Stands in for a sibling-org-operated environment in the demo inventory.",
   });
 
-  const discourseVendor = await upsertHost({
-    hostname: "Discourse Vendor Cloud",
+  const vendorCloud = await upsertHost({
+    hostname: "example-vendor-cloud",
     kind: "external",
-    location: "Vendor-managed (Discourse hosting)",
-    notes:
-      "Managed Discourse hosting for the EDCH community forum at demo-forum.example.invalid. " +
-      "Theme: Example Theme with custom user fields for Registry-organisation tagging.",
+    location: "Vendor-managed (illustrative SaaS hosting)",
+    notes: "Stands in for any vendor-hosted SaaS service in the demo inventory.",
   });
 
   // ---- Services ---------------------------------------------------------
-  const registry = await upsertService({
-    name: "Registry",
+  // Demo entries — one row per EDCH brand component, plus an access-layer
+  // service that sits outside the component scheme. Replace via seed.local.ts
+  // for the real inventory.
+  const demoRegistry = await upsertService({
+    name: "Demo Registry",
     description:
-      "EDCH Registry — Drupal-based catalogue of Diamond OA Publishers, Service " +
-      "Providers, and Tools & Technology Providers. Main entry point into the EDCH " +
-      "network; profile management, organisation ownership claims, geofield-driven " +
-      "map views.",
+      "Illustrative directory service — demo placeholder for the Forum & Registry " +
+      "brand component. Real inventory lives in db/seed.local.ts.",
     lifecycleState: "production",
-    ownerId: tech.id,
-    repoUrl: "https://github.com/example-org/demo-registry",
+    ownerId: demoOwner.id,
     metadata: {
       component: "Forum & Registry",
       primary_url: "https://demo-registry.example.invalid",
-      legacy_url: "https://demo-registry-legacy.example.invalid",
-      stack: "Drupal · PHP 8.3 · Nginx · MariaDB",
-      origin: "Example Vendor (developer), OPERAS (operator)",
+      stack: "Illustrative stack",
     },
   });
 
-  const cap = await upsertService({
-    name: "CAP",
+  const demoAccessPoint = await upsertService({
+    name: "Demo Access Point",
     description:
-      "EDCH Common Access Point — Drupal-based main entry site for the European " +
-      "Diamond Capacity Hub. Provides navigation across EDCH services and the " +
-      "federated sign-on path planned in ADR-0003.",
+      "Illustrative access-layer service — demo placeholder for a federated SSO " +
+      "entry point. No brand component; access-layer infrastructure.",
     lifecycleState: "production",
-    ownerId: tech.id,
+    ownerId: demoOwner.id,
     metadata: {
       component: null,
       primary_url: "https://demo-cap.example.invalid",
-      test_url: "https://demo-cap.example.invalid",
-      stack: "Drupal",
-      origin: "Example Vendor (developer), OPERAS (operator)",
     },
   });
 
-  const forum = await upsertService({
-    name: "Forum",
+  const demoForum = await upsertService({
+    name: "Demo Forum",
     description:
-      "EDCH community forum — Discourse instance for discussion, announcements " +
-      "and Q&A. Custom user fields capture Registry-organisation affiliation " +
-      "during sign-up (planned: automation via Registry → Discourse linking).",
+      "Illustrative community forum — demo placeholder for the Forum & Registry " +
+      "brand component (forum half).",
     lifecycleState: "production",
-    ownerId: tech.id,
+    ownerId: demoOwner.id,
     metadata: {
       component: "Forum & Registry",
       primary_url: "https://demo-forum.example.invalid",
-      stack: "Discourse · Example Theme",
     },
   });
 
-  const ddh = await upsertService({
-    name: "DDH",
+  const demoDiscovery = await upsertService({
+    name: "Demo Discovery",
     description:
-      "Diamond Discovery Hub — discovery service for Diamond OA journals. " +
-      "Exposes both an API (for upstream Diamond-journal feeds) and a web UI " +
-      "(Example-partner-managed editorial path for non-fully-Diamond journals). Originally " +
-      "delivered under CRAFT-OA.",
+      "Illustrative discovery service — demo placeholder for the Diamond Discovery " +
+      "Hub brand component.",
     lifecycleState: "production",
-    ownerId: tech.id,
-    metadata: {
-      component: "Diamond Discovery Hub",
-      operator: "Example Partner (with EDCH coordination)",
-      docs: "Example Discovery Hub Confluence workspace",
-    },
+    ownerId: demoOwner.id,
+    metadata: { component: "Diamond Discovery Hub" },
   });
 
-  const handbook = await upsertService({
-    name: "Handbook",
+  const demoHandbook = await upsertService({
+    name: "Demo Handbook",
     description:
-      "EDCH living handbook — public documentation surface for EDCH governance, " +
-      "service-operation guidelines and onboarding material.",
+      "Illustrative documentation surface — demo placeholder for the Resources & " +
+      "Guidelines brand component.",
     lifecycleState: "planned",
-    ownerId: tech.id,
-    metadata: {
-      component: "Resources & Guidelines",
-    },
+    ownerId: demoOwner.id,
+    metadata: { component: "Resources & Guidelines" },
   });
 
-  const selfAssessment = await upsertService({
-    name: "Self-assessment tool",
+  const demoStandard = await upsertService({
+    name: "Demo Self-assessment",
     description:
-      "Diamond OA self-assessment tool — guided questionnaire for Diamond OA " +
-      "publishers and service providers to evaluate alignment with the Diamond " +
-      "OA Standard. Externally developed; no Trivy dependency (per supply-chain " +
-      "vetting).",
+      "Illustrative self-assessment questionnaire — demo placeholder for the " +
+      "Diamond OA Standard brand component.",
     lifecycleState: "production",
-    ownerId: tech.id,
-    metadata: {
-      component: "Diamond OA Standard",
-      operator: "External development team",
-    },
+    ownerId: demoOwner.id,
+    metadata: { component: "Diamond OA Standard" },
   });
 
-  const training = await upsertService({
-    name: "Training",
+  const demoTraining = await upsertService({
+    name: "Demo Training",
     description:
-      "EDCH Training Platform — Moodle 4.5 LTS instance. OIDC/OAuth2 integration " +
-      "with the EDCH AAI is planned (target: before Moodle 5.0 LTS upgrade by " +
-      "end of 2026).",
-    lifecycleState: "production",
-    ownerId: tech.id,
-    metadata: {
-      component: "Training Platform",
-      stack: "Moodle 4.5.2 LTS",
-      planned_upgrade: "Moodle 5.0 LTS, target end-2026",
-    },
+      "Illustrative learning management surface — demo placeholder for the Training " +
+      "Platform brand component.",
+    lifecycleState: "staging",
+    ownerId: demoOwner.id,
+    metadata: { component: "Training Platform" },
   });
 
-  const publishingTools = await upsertService({
-    name: "Publishing Tools",
+  const demoTools = await upsertService({
+    name: "Demo Publishing Tools",
     description:
-      "EDCH Publishing Tools — service-group placeholder covering publishing-side " +
-      "tooling recommended by the EDCH (OJS, Janeway, etc.). Concrete services in " +
-      "this group land as separate rows as they get formalised.",
+      "Illustrative publishing-toolchain service-group — demo placeholder for the " +
+      "Publishing Tools brand component.",
     lifecycleState: "planned",
-    ownerId: tech.id,
-    metadata: {
-      component: "Publishing Tools",
-    },
+    ownerId: demoOwner.id,
+    metadata: { component: "Publishing Tools" },
   });
 
   // ---- Dependencies -----------------------------------------------------
+  await ensureDependency(demoAccessPoint.id, paas.id, "service-runs-on-host");
+  await ensureDependency(demoRegistry.id, paas.id, "service-runs-on-host");
+  await ensureDependency(demoDiscovery.id, partnerCloud.id, "service-runs-on-host");
+  await ensureDependency(demoForum.id, vendorCloud.id, "service-runs-on-host");
   await ensureDependency(
-    cap.id,
-    pcss.id,
-    "service-runs-on-host",
-    "Drupal app deployed in OKD project example-edch-project.",
+    demoForum.id,
+    demoAccessPoint.id,
+    "service-uses-aai",
+    "Illustrative: forum delegates sign-in to the access point.",
   );
   await ensureDependency(
-    registry.id,
-    pcss.id,
-    "service-runs-on-host",
-    "Drupal app deployed alongside CAP in the same OKD project.",
-  );
-  await ensureDependency(
-    ddh.id,
-    icm.id,
-    "service-runs-on-host",
-    "Example-partner-operated infrastructure.",
-  );
-  await ensureDependency(
-    forum.id,
-    discourseVendor.id,
-    "service-runs-on-host",
-    "Vendor-managed Discourse hosting.",
+    demoRegistry.id,
+    demoAccessPoint.id,
+    "service-uses-aai",
+    "Illustrative: registry delegates sign-in to the access point.",
   );
 
-  // Silence unused-variable warning for services we don't yet wire deps for.
-  void handbook;
-  void selfAssessment;
-  void training;
-  void publishingTools;
-  void sql; // exported in case follow-up ops want raw SQL escape hatch
+  // Silence unused-variable noise for services we don't yet wire deps for.
+  void demoHandbook;
+  void demoStandard;
+  void demoTraining;
+  void demoTools;
+  void sql;
 }
 
 try {

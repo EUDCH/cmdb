@@ -16,7 +16,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
-    "db:seed": "bun run db/seed.ts"
+    "db:seed": "bun run db/seed.ts",
+    "db:seed:local": "bun run db/seed.local.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",

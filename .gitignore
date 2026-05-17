@@ -147,3 +147,9 @@ vite.config.ts.timestamp-*
 
 # Keep .env.example tracked, ignore the rest of .env*
 !.env.example
+
+# Local seed — real operational inventory that must never reach the
+# public repo. The public `db/seed.ts` ships illustrative demo data only.
+# See README §Seeding.
+db/seed.local.ts
+db/seed.local.*.ts
