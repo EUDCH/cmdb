@@ -74,7 +74,7 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 2. **Library unit tests** — `src/lib/*` (db queries, session, auth helpers). Fast, no infra.
 3. **End-to-end browser tests** — only once the HTMX-driven interactive paths exist; not warranted while pages are read-only.
 
-**Principle, not exact CI shape:** integration tests need a real Postgres in CI (mocking the DB defeats the point of the route-integration tier). The current concrete shape lives in `.github/workflows/ci.yml` — read that for the exact image, env vars, and step sequence. Local dev uses `docker-compose.yml`; CI uses whatever is simplest there (GitHub Actions `services:` at time of writing). When the concrete shape changes, update the workflow — this file stays principle-level so it doesn't go stale on every infra tweak.
+**Principle, not exact CI shape:** integration tests need a real Postgres in CI (mocking the DB defeats the point of the route-integration tier). The current concrete shape (does the `test` job have a Postgres service, what image, what env vars, what step sequence) lives in `.github/workflows/ci.yml` — read that for ground truth and update it when the principle and the workflow diverge. Local dev uses `docker-compose.yml`. This file stays principle-level so it doesn't go stale on every infra tweak; if you're about to add a route integration test and the workflow doesn't yet provision a Postgres, that's a workflow change too, not a contradiction with this guidance.
 
 **Test data:** fixtures used by integration tests live under `tests/` (separate from `db/seed.ts`, which is the demo seed shipped in the repo). Keep test fixtures minimal and deterministic so assertions stay stable as the demo seed grows.
 
@@ -83,7 +83,7 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 - **Never commit secrets**. The CI `secrets` job runs `gitleaks` against the full history; a failure blocks merge.
 - **Never push real inventory data**. `db/seed.local.ts` carries the real EDCH inventory and is gitignored; `db/seed.ts` carries demo data only. If you add real data to a public file by accident, surface it immediately so the history can be rewritten before the leak ages.
 - **All URLs in fixtures and demo data** use the `.example.invalid` TLD (RFC 2606). Don't write real customer URLs into tests.
-- **CI runs `AUTH_MODE=dev`** with structural placeholder `SESSION_SECRET` and `DATABASE_URL` values inlined in `.github/workflows/ci.yml` (no `${{ secrets.* }}` references in the build env — production secrets never enter CI by construction). If you add code that throws at module-import without an env var, supply a structural placeholder in the workflow (see the `build` job's env block for the pattern). Don't introduce a `${{ secrets.* }}` fallback "just in case" — that turns the absence-of-secret into a silent footgun.
+- **Production secrets never enter CI by construction.** No `${{ secrets.* }}` references in any job's env block; jobs that need values (e.g. the `build` job, which fails at module-import without `DATABASE_URL`, `SESSION_SECRET`, `AUTH_MODE`) inline structural placeholders directly in `.github/workflows/ci.yml`. Currently only the `build` job carries that env triple — other jobs don't need it because they don't import the SSR modules. If you add a job that does, follow the same pattern (inline placeholders, not secret-fallbacks). Don't introduce a `${{ secrets.* }}` fallback "just in case" — that turns the absence-of-secret into a silent footgun where a configured prod-ish DSN would flow into the build env.
 
 ## Linters and formatters
 
@@ -101,9 +101,9 @@ bun run check && bun run typecheck && bun test
 This catches TS/Astro/test errors but does **not** mirror the full CI run. To check the remaining lint steps locally before pushing:
 
 ```sh
-bun x markdownlint-cli2                # markdown lint (uses .markdownlint-cli2.yaml)
-bun x yamllint .                       # yaml lint   (uses .yamllint.yml; requires `pip install yamllint` once)
-docker run --rm -i hadolint/hadolint < Dockerfile   # Dockerfile lint
+bun x markdownlint-cli2                            # markdown lint (uses .markdownlint-cli2.yaml)
+yamllint .                                         # YAML lint    (Python tool — install once with `pip install yamllint` or `pipx install yamllint`; not on the bun/npm path)
+docker run --rm -i hadolint/hadolint < Dockerfile  # Dockerfile lint
 ```
 
 The `secrets` CI job runs `gitleaks` against the full git history — there's no fast local equivalent worth running every push; rely on CI for that gate.
