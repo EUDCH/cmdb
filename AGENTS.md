@@ -79,12 +79,54 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 
 **Test data:** fixtures used by integration tests live under `tests/` (separate from `db/seed.ts`, which is the demo seed shipped in the repo). Keep test fixtures minimal and deterministic so assertions stay stable as the demo seed grows.
 
+### Running integration tests locally
+
+Integration tests under `tests/routes/` need the SSR server reachable on `TEST_BASE_URL` (default `http://127.0.0.1:4321`) AND a fresh deterministic fixture applied to its database. A bare `bun test` is safe — if the server isn't up, the integration suite **skips itself** with a console message rather than failing. To exercise the suite locally:
+
+```sh
+# 1. Once — create a dedicated test database in the dev Postgres container
+#    so the destructive reset never touches the dev `cmdb` inventory.
+docker exec cmdb-postgres psql -U cmdb -d cmdb -c "CREATE DATABASE cmdb_test;"
+
+# 2. Apply the deterministic test fixture (drops + recreates `public` schema,
+#    applies migration 0001, inserts 3 services / 2 hosts / 1 owner / 1 dep).
+#    tests/setup-db.ts has a safety guard: it refuses to run unless CI=true,
+#    the database name matches /test|ci/i, or CMDB_ALLOW_DESTRUCTIVE_RESET=1.
+DATABASE_URL=postgresql://cmdb:cmdb@localhost:5432/cmdb_test \
+  bun run tests/setup-db.ts
+
+# 3a. Build the SSR server (foreground — must finish before step 3b).
+#     Note: the build does NOT background. Backgrounding `bun run build &&
+#     bun run start` would background the whole AND-list, so the next
+#     command could fire before build/start has actually backgrounded.
+DATABASE_URL=postgresql://cmdb:cmdb@localhost:5432/cmdb_test \
+  AUTH_MODE=dev \
+  SESSION_SECRET=local-test-secret-32-bytes-minimum-________ \
+  bun run build
+
+# 3b. Start the SSR server in the background (note the trailing `&` on
+#     this line only — backgrounds just the `start` command).
+DATABASE_URL=postgresql://cmdb:cmdb@localhost:5432/cmdb_test \
+  AUTH_MODE=dev \
+  SESSION_SECRET=local-test-secret-32-bytes-minimum-________ \
+  PORT=4322 bun run start &
+
+# 3c. Wait for the server's TCP port (the suite has its own reachability
+#     probe but a short wait avoids running tests before the server is up).
+until (echo > /dev/tcp/127.0.0.1/4322) 2>/dev/null; do sleep 0.2; done
+
+# 4. Run the suite against the local server.
+TEST_BASE_URL=http://127.0.0.1:4322 bun test
+```
+
+CI runs an equivalent sequence via the `test` workflow job; the GHA `services: postgres:` block provisions a `cmdb_test` database that the strict safety guard in `tests/setup-db.ts` accepts uniformly with local runs (no CI bypass).
+
 ## Security & secrets
 
 - **Never commit secrets**. The CI `secrets` job runs `gitleaks` against the full history; a failure blocks merge.
 - **Never push real inventory data**. `db/seed.local.ts` carries the real EDCH inventory and is gitignored; `db/seed.ts` carries demo data only. If you add real data to a public file by accident, surface it immediately so the history can be rewritten before the leak ages.
 - **All URLs in fixtures and demo data** use the `.example.invalid` TLD (RFC 2606). Don't write real customer URLs into tests.
-- **Production secrets never enter CI by construction.** No `${{ secrets.* }}` references in any job's env block; jobs that need values (e.g. the `build` job, which fails at module-import without `DATABASE_URL`, `SESSION_SECRET`, `AUTH_MODE`) inline structural placeholders directly in `.github/workflows/ci.yml`. Currently only the `build` job carries that env triple — other jobs don't need it because they don't import the SSR modules. If you add a job that does, follow the same pattern (inline placeholders, not secret-fallbacks). Don't introduce a `${{ secrets.* }}` fallback "just in case" — that turns the absence-of-secret into a silent footgun where a configured prod-ish DSN would flow into the build env.
+- **Production secrets never enter CI by construction.** No `${{ secrets.* }}` references in any job's env block; jobs that need values inline structural placeholders directly in `.github/workflows/ci.yml`. Two jobs currently carry env: the `build` job (which fails at module-import without `DATABASE_URL`, `SESSION_SECRET`, `AUTH_MODE`) and the `test` job (which connects to its Postgres service and boots the SSR server end-to-end). Both use inline placeholders, never `${{ secrets.* }}`. If you add a job that needs env, follow the same pattern. Don't introduce a `${{ secrets.* }}` fallback "just in case" — that turns absence-of-secret into a silent footgun where a configured prod-ish DSN would flow into the build env.
 
 ## Linters and formatters
 
