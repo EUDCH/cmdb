@@ -21,6 +21,36 @@ if (!url) {
   process.exit(1);
 }
 
+// Safety guard — this script DROPs the public schema. Without an explicit
+// allow-marker it refuses to run, so a misconfigured local shell (e.g.
+// DATABASE_URL still pointing at the dev `cmdb` database that holds real
+// EDCH inventory) can't accidentally wipe production data. CI runs are
+// auto-approved via the GitHub Actions `CI=true` env var; local runs need
+// either a `cmdb_test`-ish database name, or an explicit
+// CMDB_ALLOW_DESTRUCTIVE_RESET=1 override.
+const isCi = process.env.CI === "true";
+const dbName = url.split("/").pop()?.split("?")[0] ?? "";
+const looksLikeTestDb = /test|ci/i.test(dbName);
+const explicitOverride = process.env.CMDB_ALLOW_DESTRUCTIVE_RESET === "1";
+
+if (!isCi && !looksLikeTestDb && !explicitOverride) {
+  console.error(
+    `Refusing to reset schema on DATABASE_URL=${url}\n` +
+      `  - database name "${dbName}" does not match /test|ci/i\n` +
+      `  - CI env var is not "true"\n` +
+      `  - CMDB_ALLOW_DESTRUCTIVE_RESET is not "1"\n` +
+      `\n` +
+      `For local integration testing, point DATABASE_URL at a dedicated test\n` +
+      `database (e.g. \`postgresql://cmdb:cmdb@localhost:5432/cmdb_test\`).\n` +
+      `Create it once with:\n` +
+      `  docker exec cmdb-postgres psql -U cmdb -d cmdb -c "CREATE DATABASE cmdb_test;"\n` +
+      `\n` +
+      `To override (NOT recommended — will DROP SCHEMA on the target DB):\n` +
+      `  CMDB_ALLOW_DESTRUCTIVE_RESET=1 bun run tests/setup-db.ts`,
+  );
+  process.exit(1);
+}
+
 // max: 1 — the migration uses raw BEGIN/COMMIT; postgres-js rejects those
 // with UNSAFE_TRANSACTION when pool size > 1.
 const sql = postgres(url, { max: 1, onnotice: () => {} });
