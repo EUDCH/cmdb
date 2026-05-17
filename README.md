@@ -1,21 +1,18 @@
-# OPERAS CMDB
+# EDCH CMDB
 
-Configuration Management Database for [OPERAS](https://www.operas-eu.org) and the [European Diamond Capacity Hub (EDCH)](https://www.eudch.eu).
+Configuration Management Database for the [European Diamond Capacity Hub (EDCH)](https://www.eudch.eu) — services under EDCH technical coordination get their inventory (hosts, owner, dependencies, lifecycle state, escalation contacts) captured in a queryable web application.
 
-**v1 — EDCH-first.** Every service operated under the EDCH technical coordination role gets its inventory (hosts, owner, dependencies, lifecycle state, escalation contacts) captured in a queryable web application.
-
-**v2 — OPERAS-wide.** Same data model, broader tenant. EDCH is the first namespace; OPERAS becomes a sibling once the v1 MVP is proven.
-
-Currently in design phase — no code yet. See `docs/` for architecture and decision records.
+EDCH is hosted by [OPERAS](https://www.operas-eu.org); shared infrastructure (OPERAS ID for auth, OPERAS IMS for service docs) is integrated as upstream, but the CMDB itself is scoped to EDCH operations. A second `operas` namespace is planned for v2 (ADR-0002) to widen coverage without a schema migration.
 
 ## Status
 
 | Item | State |
 | --- | --- |
 | Stack | Bun · Astro (SSR) + HTMX · PostgreSQL · Drizzle ORM · OIDC (OPERAS ID) — see [`docs/adr/0001-stack.md`](docs/adr/0001-stack.md) |
-| Schema namespace constraint | Decided — see [`docs/adr/0002-namespace.md`](docs/adr/0002-namespace.md) |
+| Schema namespace constraint | `edch` only in v1; `operas` added additively in v2 — see [`docs/adr/0002-namespace.md`](docs/adr/0002-namespace.md) |
+| Auth | OIDC against OPERAS ID + `AUTH_MODE=dev` escape hatch — see [`docs/adr/0003-auth.md`](docs/adr/0003-auth.md) |
 | Deployment target | Example PaaS (likely) |
-| Repo location | EUDCH org for now, may move to OPERAS org for v2 |
+| Repo location | [EUDCH](https://github.com/EUDCH) GitHub org |
 
 ## Quickstart
 

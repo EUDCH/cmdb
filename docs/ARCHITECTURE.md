@@ -4,9 +4,9 @@
 
 ## Overview
 
-The OPERAS CMDB is a queryable web application backed by a relational database. It stores asset-level entities (services, hosts, owners, dependencies) with a mandatory `namespace` field on every table — enabling EDCH-first deployment now and OPERAS-wide expansion later without schema migration.
+The EDCH CMDB is a queryable web application backed by a relational database. It stores asset-level entities (services, hosts, owners, dependencies) for services operated under the European Diamond Capacity Hub technical coordination role. Every table carries a mandatory `namespace` field so that — when OPERAS-wide coverage becomes the next ask — adding an `operas` sibling namespace is an additive migration, not a rewrite (ADR-0002).
 
-The CMDB is the **system of record** for asset data — it is where data is edited, not a mirror of upstream sources. Other systems (OPERAS IMS in Confluence + Jira, monitoring stacks, source repos) link **into** the CMDB; the CMDB links **out** to them via canonical pointers.
+The CMDB is the **system of record** for EDCH asset data — it is where data is edited, not a mirror of upstream sources. Adjacent systems (OPERAS IMS in Confluence + Jira, monitoring stacks, source repos) link **into** the CMDB; the CMDB links **out** to them via canonical pointers.
 
 ## Data Model (sketch)
 
