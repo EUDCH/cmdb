@@ -1,8 +1,11 @@
 ---
+import { getAuthMode } from "~/lib/auth";
 interface Props {
   title: string;
 }
 const { title } = Astro.props;
+const devAuth = getAuthMode() === "dev";
+const session = Astro.locals.session;
 ---
 <!doctype html>
 <html lang="en">
@@ -32,11 +35,23 @@ const { title } = Astro.props;
       th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
       .muted { color: var(--muted); }
       .pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; background: #e8edf6; color: var(--accent); font-size: 0.85rem; }
+      .dev-auth-banner { background: #b00020; color: white; padding: 0.5rem 1rem; text-align: center; font-weight: 700; letter-spacing: 0.05em; }
+      header .session { float: right; font-size: 0.9rem; color: var(--muted); }
+      header .session a { color: var(--accent); margin-left: 0.5rem; }
     </style>
   </head>
   <body>
+    {devAuth && (
+      <div class="dev-auth-banner">DEV AUTH — NO PRODUCTION USE</div>
+    )}
     <header>
       <h1>OPERAS CMDB</h1>
+      {session && (
+        <span class="session">
+          {session.name ?? session.email ?? session.sub}
+          {!devAuth && <a href="/auth/logout">Sign out</a>}
+        </span>
+      )}
       <nav>
         <a href="/">Home</a>
         <a href="/services">Services</a>
