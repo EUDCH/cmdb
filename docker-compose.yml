@@ -1,0 +1,64 @@
+# Local dev + test stack for OPERAS CMDB.
+#
+# Two modes:
+#
+#   1. DB only (default — recommended for active dev):
+#        docker compose up -d
+#        bun run dev               # app runs natively on the host
+#
+#   2. Full stack (app + DB in containers, production-like test):
+#        docker compose --profile app up -d --build
+#
+# The migration in ./migrations/0001_init.sql is auto-applied on the first
+# Postgres boot via /docker-entrypoint-initdb.d/. To replay after a schema
+# change during development:
+#
+#        docker compose down -v        # drops the data volume
+#        docker compose up -d
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cmdb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cmdb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cmdb}
+      POSTGRES_DB: ${POSTGRES_DB:-cmdb}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - cmdb-pgdata:/var/lib/postgresql/data
+      - ./migrations/0001_init.sql:/docker-entrypoint-initdb.d/0001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cmdb} -d ${POSTGRES_DB:-cmdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cmdb-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cmdb}:${POSTGRES_PASSWORD:-cmdb}@postgres:5432/${POSTGRES_DB:-cmdb}
+      HOST: 0.0.0.0
+      PORT: 4321
+      # OIDC values come from .env — production wiring is ADR-0003.
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-do-not-use-in-production}
+    ports:
+      - "4321:4321"
+
+volumes:
+  cmdb-pgdata:
+    name: cmdb-pgdata
