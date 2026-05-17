@@ -81,7 +81,7 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 
 ### Running integration tests locally
 
-Integration tests under `tests/routes/` need the SSR server reachable on `TEST_BASE_URL` (default `http://127.0.0.1:4321`) AND a fresh deterministic fixture applied to its database. Reachability behavior depends on the run mode:
+Integration tests under `tests/routes/` need the SSR server reachable on `TEST_BASE_URL` (default `http://127.0.0.1:4322` — note: NOT the dev-server's `:4321`, to avoid hitting `bun run dev` against the real dev DB) AND a fresh deterministic fixture applied to its database. Reachability behavior depends on the run mode:
 
 - **Local** (`CI` is anything other than the exact string `"true"` — including unset, `false`, or even `1`): a bare `bun test` is safe — if the server isn't up, the integration suite **skips itself** with a console message rather than failing. This lets contributors run `bun test` on a fresh clone without spinning up the integration stack first.
 - **CI** (`CI` is exactly the string `"true"`, which GitHub Actions sets by default): an unreachable server is treated as a **hard failure** at module-import time, not a skip. A silent skip in CI would mask exactly the problem the workflow's start-server step is meant to catch. The check uses strict equality (`process.env.CI === "true"`), so other truthy values like `1` keep the local skip behavior — set `CI=true` explicitly if you want CI-style hard failures locally.

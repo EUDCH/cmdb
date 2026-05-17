@@ -2,7 +2,8 @@
  * Route integration test — GET /services.
  *
  * Preconditions: the SSR server must be reachable at TEST_BASE_URL (default
- * http://127.0.0.1:4321) and `tests/setup-db.ts` must have applied the
+ * http://127.0.0.1:4322 — NOT 4321, which is the dev-server port) and
+ * `tests/setup-db.ts` must have applied the
  * deterministic fixture against the same database the server is connected
  * to. The CI workflow's `test` job handles both. For local runs, see the
  * "Running integration tests locally" block in AGENTS.md.
@@ -18,7 +19,14 @@
  */
 import { describe, expect, test } from "bun:test";
 
-const BASE_URL = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4321";
+// Default to :4322 (not the dev-server's :4321). If `bun run dev` is up on
+// 4321 and a contributor runs `bun test`, the suite would hit the dev
+// server — connected to the real dev DB, not the deterministic test
+// fixture — producing confusing pass/fail results. Defaulting to :4322
+// (the documented local integration-test port in AGENTS.md) avoids that
+// collision while keeping zero-arg `bun test` UX. Override via TEST_BASE_URL
+// if your test server lives elsewhere.
+const BASE_URL = process.env.TEST_BASE_URL ?? "http://127.0.0.1:4322";
 
 // Top-level await: probe synchronously before tests are defined so
 // `describe.skipIf` has a definitive boolean at definition time.

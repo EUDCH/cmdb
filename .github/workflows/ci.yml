@@ -107,7 +107,10 @@ jobs:
       AUTH_MODE: dev
       SESSION_SECRET: ci-placeholder-secret-32-bytes-minimum-________
       HOST: 127.0.0.1
-      PORT: "4321"
+      # Integration-test server runs on :4322, not the dev-server's :4321
+      # (the test suite defaults TEST_BASE_URL to :4322 for the same reason
+      # — keeps the dev-server port reserved for `bun run dev`).
+      PORT: "4322"
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -128,7 +131,7 @@ jobs:
         # be hidden as "server did not come up".
         run: |
           for i in {1..30}; do
-            if (echo > /dev/tcp/127.0.0.1/4321) 2>/dev/null; then
+            if (echo > /dev/tcp/127.0.0.1/4322) 2>/dev/null; then
               echo "Server ready after ${i}s"
               exit 0
             fi
