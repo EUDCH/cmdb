@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "description": "OPERAS / EDCH Configuration Management Database — v1 EDCH-first, v2 OPERAS-broader",
+  "description": "EDCH Configuration Management Database — inventory for services operated by the European Diamond Capacity Hub (EDCH); OPERAS sibling namespace planned for v2.",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

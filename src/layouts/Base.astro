@@ -12,7 +12,7 @@ const session = Astro.locals.session;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} — OPERAS CMDB</title>
+    <title>{title} — EDCH CMDB</title>
     <script is:inline src="https://unpkg.com/htmx.org@2.0.4" defer></script>
     <style>
       :root {
@@ -45,7 +45,7 @@ const session = Astro.locals.session;
       <div class="dev-auth-banner">DEV AUTH — NO PRODUCTION USE</div>
     )}
     <header>
-      <h1>OPERAS CMDB</h1>
+      <h1>EDCH CMDB</h1>
       {session && (
         <span class="session">
           {session.name ?? session.email ?? session.sub}
