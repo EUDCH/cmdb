@@ -58,7 +58,13 @@ const session = Astro.locals.session;
         font-size: 1.4rem;
         color: var(--accent);
         letter-spacing: 0.02em;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
       }
+      header h1 .wordmark { height: 1.6rem; width: auto; display: block; }
+      header h1 .sep { color: var(--border); font-weight: 400; }
+      header h1 .app  { font-weight: 500; color: var(--muted); font-size: 1rem; letter-spacing: 0.06em; text-transform: uppercase; }
       header nav { margin-top: 0.5rem; }
       header nav a {
         color: var(--fg);
@@ -140,7 +146,11 @@ const session = Astro.locals.session;
       <div class="dev-auth-banner">DEV AUTH — NO PRODUCTION USE</div>
     )}
     <header>
-      <h1>EDCH CMDB</h1>
+      <h1>
+        <img src="/edch-wordmark.svg" alt="EDCH" class="wordmark" />
+        <span class="sep">·</span>
+        <span class="app">CMDB</span>
+      </h1>
       {session && (
         <span class="session">
           {session.name ?? session.email ?? session.sub}
