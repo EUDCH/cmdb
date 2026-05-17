@@ -35,6 +35,28 @@ updates:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
+    # Ignore semver-major bumps for deps that need deliberate, hand-driven
+    # migrations beyond a one-line bump. Dependabot otherwise re-opens the
+    # same broken PR every week, which is noise. Each ignore has a tracking
+    # issue with the migration plan; revert the ignore in the migration PR
+    # so future bumps come back online.
+    ignore:
+      # TypeScript 5 → 6: tsconfig.json uses `baseUrl` which is a deprecation
+      # error in TS 6 (silenced via `ignoreDeprecations: "6.0"` or removed
+      # since TS 4.1+ supports `paths` standalone). Tracked: #20.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Astro 5 → 6: hard-requires Node ≥ 22.12.0, but the GHA runner's PATH
+      # Node is 20 (Bun emulates 24 but Astro CLI reads the runner's Node).
+      # CI workflow needs an `actions/setup-node@v4` step before Bun. Also
+      # spans real breaking changes across the 5.x → 6.x window. Tracked:
+      # #21. `@astrojs/node@10` requires Astro 6.3+ — must migrate together.
+      - dependency-name: "astro"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/check"
+        update-types: ["version-update:semver-major"]
     groups:
       astro:
         patterns:
