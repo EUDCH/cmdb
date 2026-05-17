@@ -27,8 +27,12 @@ updates:
       timezone: "Europe/Paris"
     open-pull-requests-limit: 5
     commit-message:
+      # `prefix` already carries the "deps" scope; do NOT add `include: "scope"`
+      # — Dependabot would then append the ecosystem name, producing malformed
+      # titles like `chore(deps)(bun): bump astro` (two scopes is not valid
+      # Conventional Commits). Single scope `chore(deps): bump astro …` matches
+      # the AGENTS.md ceremony.
       prefix: "chore(deps)"
-      include: "scope"
     labels:
       - "dependencies"
     groups:
