@@ -81,7 +81,12 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 
 ### Running integration tests locally
 
-Integration tests under `tests/routes/` need the SSR server reachable on `TEST_BASE_URL` (default `http://127.0.0.1:4321`) AND a fresh deterministic fixture applied to its database. A bare `bun test` is safe — if the server isn't up, the integration suite **skips itself** with a console message rather than failing. To exercise the suite locally:
+Integration tests under `tests/routes/` need the SSR server reachable on `TEST_BASE_URL` (default `http://127.0.0.1:4321`) AND a fresh deterministic fixture applied to its database. Reachability behavior depends on the run mode:
+
+- **Local** (no `CI` env, or `CI` unset/false): a bare `bun test` is safe — if the server isn't up, the integration suite **skips itself** with a console message rather than failing. This lets contributors run `bun test` on a fresh clone without spinning up the integration stack first.
+- **CI** (`CI=true`): an unreachable server is treated as a **hard failure** at module-import time, not a skip. A silent skip in CI would mask exactly the problem the workflow's start-server step is meant to catch.
+
+To exercise the suite locally:
 
 ```sh
 # 1. Once — create a dedicated test database in the dev Postgres container
@@ -89,9 +94,20 @@ Integration tests under `tests/routes/` need the SSR server reachable on `TEST_B
 docker exec cmdb-postgres psql -U cmdb -d cmdb -c "CREATE DATABASE cmdb_test;"
 
 # 2. Apply the deterministic test fixture (drops + recreates `public` schema,
-#    applies migration 0001, inserts 3 services / 2 hosts / 1 owner / 1 dep).
-#    tests/setup-db.ts has a safety guard: it refuses to run unless CI=true,
-#    the database name matches /test|ci/i, or CMDB_ALLOW_DESTRUCTIVE_RESET=1.
+#    applies every `migrations/*.sql` in lexicographic order so the test DB
+#    stays aligned with whatever production runs, then inserts the fixture:
+#    3 services / 2 hosts / 1 owner / 1 dep).
+#
+#    tests/setup-db.ts has a fail-closed safety guard against accidental
+#    wipes of a production-shaped DB. It refuses unless either:
+#      - the database name matches /^[a-z][a-z0-9_]*_(test|ci)$/i
+#        (strict suffix regex — `cmdb_test`, `myapp_ci`, etc.; does NOT
+#        match substrings inside ordinary names like `capacity`), OR
+#      - CMDB_ALLOW_DESTRUCTIVE_RESET=1 is set (one-off recovery only;
+#        never set it in normal local or CI flows).
+#
+#    There is no CI=true bypass: CI's workflow points DATABASE_URL at a
+#    `cmdb_test` database so the same guard applies uniformly.
 DATABASE_URL=postgresql://cmdb:cmdb@localhost:5432/cmdb_test \
   bun run tests/setup-db.ts
 
