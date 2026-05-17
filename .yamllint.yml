@@ -1,0 +1,16 @@
+extends: default
+
+ignore: |
+  node_modules/
+  dist/
+  .astro/
+  .git/
+  .github/workflows/*.yml.bak
+
+rules:
+  document-start: disable
+  line-length:
+    max: 120
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
