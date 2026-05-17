@@ -12,7 +12,7 @@ Currently in design phase — no code yet. See `docs/` for architecture and deci
 
 | Item | State |
 | --- | --- |
-| Stack | TBD — see [`docs/adr/0001-stack.md`](docs/adr/0001-stack.md) |
+| Stack | Bun · Astro (SSR) + HTMX · PostgreSQL · Drizzle ORM · OIDC (OPERAS ID) — see [`docs/adr/0001-stack.md`](docs/adr/0001-stack.md) |
 | Schema namespace constraint | Decided — see [`docs/adr/0002-namespace.md`](docs/adr/0002-namespace.md) |
 | Deployment target | PCSS (likely) |
 | Repo location | EUDCH org for now, may move to OPERAS org for v2 |
