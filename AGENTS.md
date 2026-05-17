@@ -61,6 +61,7 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 - **Squash-merge** is the default; preserve the PR number in the subject so `Closes` traces back.
 - **Force-push** to a feature branch is fine while the PR is open (always `--force-with-lease`). **Never** force-push to `main`.
 - **Always rebase open PRs when `main` advances.** GitHub's `MERGEABLE` flag only means "no textual conflict on a 3-way merge" — it does NOT mean CI was re-run against the post-merge state. After any PR merges to `main`, every other open PR must be rebased onto the new `main` and force-pushed (`--force-with-lease`) so CI re-runs against what would actually land. Auto-resolved rebases happen often, but the safety net is the policy, not the lucky outcome — a workflow-file change in the merged PR can semantically interact with an open PR's diff even when there's no textual conflict.
+- **Dependabot PRs follow the same ceremony**. Weekly `chore(deps):` (bun ecosystem) and `chore(ci):` (github-actions ecosystem) PRs auto-open on Monday mornings (config in `.github/dependabot.yml`). CI must be green; maintainer reviews and merges. Group PRs (astro / drizzle / types) batch related deps that always upgrade together — don't split them back apart unless you have a reason. Solo deps that need a coordinated change across packages can be flagged for manual handling.
 
 ## Testing requirements
 
