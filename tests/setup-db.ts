@@ -1,10 +1,14 @@
 /**
- * Test DB setup — applies migration 0001 + inserts a deterministic fixture.
+ * Test DB setup — drops the public schema, applies every `migrations/*.sql`
+ * in lexicographic order, then inserts a deterministic fixture.
  *
  * Run before the integration tests start (the workflow's `Apply migration +
- * seed test fixture` step). The fixture is intentionally small and stable so
- * route-level assertions can hard-code expected values without coupling to
- * `db/seed.ts` (which is for demo data and will grow over time).
+ * seed test fixture` step). The migration loop keeps the test DB aligned
+ * with whatever production runs; hardcoding a single migration would let
+ * the test schema silently drift once migration 0002+ lands. The fixture
+ * is intentionally small and stable so route-level assertions can hard-
+ * code expected values without coupling to `db/seed.ts` (which is for
+ * demo data and will grow over time).
  *
  * Fixture: 1 owner, 3 services (one per relevant lifecycle state), 2 hosts,
  * 1 dependency. Adjust deliberately when a test needs new coverage; if you
