@@ -1,35 +1,53 @@
 ---
 import Base from "~/layouts/Base.astro";
+import { asc } from "drizzle-orm";
 import { db } from "~/lib/db";
 import { service } from "@db/schema";
 
-const rows = await db.select().from(service);
+const rows = await db.select().from(service).orderBy(asc(service.name));
+
+function componentOf(metadata: unknown): string | null {
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    "component" in metadata &&
+    typeof (metadata as { component: unknown }).component === "string"
+  ) {
+    return (metadata as { component: string }).component;
+  }
+  return null;
+}
 ---
 <Base title="Services">
   <h2>Services</h2>
   <p class="muted">{rows.length} service{rows.length === 1 ? "" : "s"} in inventory.</p>
 
   {rows.length === 0 ? (
-    <p>No services yet. Add one via the API (UI form arrives in a later iteration).</p>
+    <p>No services yet. Add one via <code>bun run db:seed</code> (UI form arrives in a later iteration).</p>
   ) : (
     <table>
       <thead>
         <tr>
           <th>Namespace</th>
           <th>Name</th>
+          <th>EDCH component</th>
           <th>Lifecycle</th>
           <th>Description</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((s) => (
-          <tr>
-            <td><span class="pill">{s.namespace}</span></td>
-            <td>{s.name}</td>
-            <td><span class={`pill-lifecycle ${s.lifecycleState}`}>{s.lifecycleState}</span></td>
-            <td class="muted">{s.description ?? ""}</td>
-          </tr>
-        ))}
+        {rows.map((s) => {
+          const component = componentOf(s.metadata);
+          return (
+            <tr>
+              <td><span class="pill">{s.namespace}</span></td>
+              <td><strong>{s.name}</strong></td>
+              <td>{component ? <span class="pill-component">{component}</span> : <span class="muted">—</span>}</td>
+              <td><span class={`pill-lifecycle ${s.lifecycleState}`}>{s.lifecycleState}</span></td>
+              <td class="muted">{s.description ?? ""}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   )}

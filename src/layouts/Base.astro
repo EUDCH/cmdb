@@ -113,6 +113,19 @@ const session = Astro.locals.session;
         letter-spacing: 0.02em;
       }
 
+      /* Brand-component pill — neutral surface, accent text. */
+      .pill-component {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--accent);
+        border: 1px solid var(--accent);
+        font-size: 0.78rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
       /* Lifecycle-state pills — colours mapped from EDCH brand accents. */
       .pill-lifecycle {
         display: inline-block;

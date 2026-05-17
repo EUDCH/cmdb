@@ -1,9 +1,10 @@
 ---
 import Base from "~/layouts/Base.astro";
+import { asc } from "drizzle-orm";
 import { db } from "~/lib/db";
 import { host } from "@db/schema";
 
-const rows = await db.select().from(host);
+const rows = await db.select().from(host).orderBy(asc(host.hostname));
 ---
 <Base title="Hosts">
   <h2>Hosts</h2>
@@ -19,15 +20,17 @@ const rows = await db.select().from(host);
           <th>Hostname</th>
           <th>Kind</th>
           <th>Location</th>
+          <th>Notes</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((h) => (
           <tr>
             <td><span class="pill">{h.namespace}</span></td>
-            <td>{h.hostname}</td>
+            <td><strong>{h.hostname}</strong></td>
             <td>{h.kind}</td>
             <td class="muted">{h.location ?? ""}</td>
+            <td class="muted">{h.notes ?? ""}</td>
           </tr>
         ))}
       </tbody>
