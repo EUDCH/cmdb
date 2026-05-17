@@ -60,6 +60,7 @@ Never invoke `npm`, `yarn`, or `pnpm` — this is a Bun project end-to-end.
 - **Merge is the maintainer's call**, not the agent's. Agents open the PR, watch CI, iterate fixes until green, and then ping. Don't self-merge.
 - **Squash-merge** is the default; preserve the PR number in the subject so `Closes` traces back.
 - **Force-push** to a feature branch is fine while the PR is open (always `--force-with-lease`). **Never** force-push to `main`.
+- **Always rebase open PRs when `main` advances.** GitHub's `MERGEABLE` flag only means "no textual conflict on a 3-way merge" — it does NOT mean CI was re-run against the post-merge state. After any PR merges to `main`, every other open PR must be rebased onto the new `main` and force-pushed (`--force-with-lease`) so CI re-runs against what would actually land. Auto-resolved rebases happen often, but the safety net is the policy, not the lucky outcome — a workflow-file change in the merged PR can semantically interact with an open PR's diff even when there's no textual conflict.
 
 ## Testing requirements
 

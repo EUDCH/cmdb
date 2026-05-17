@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Authoritative repo policy lives in [`AGENTS.md`](AGENTS.md) — read that first; it is the single source of truth for every agent, including Claude.
+@AGENTS.md
 
-This file exists only so Claude Code auto-loads the policy via its project-scoped instruction convention (per the "Project-Specific Rules" section of the global `~/.claude/CLAUDE.md`). It deliberately carries **no repo-scoped policy of its own** — every rule lives in `AGENTS.md` so there is nothing to drift.
+This file exists only to import [`AGENTS.md`](AGENTS.md) into Claude Code's session context. Claude Code reads `CLAUDE.md` natively but [does not auto-load `AGENTS.md` yet](https://code.claude.com/docs/en/memory#agentsmd) (tracked at [anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)) — the `@AGENTS.md` line above is the documented idiom to wire the two together without duplicating any rules.
 
-If your Claude setup bundles personal tooling — PAI sub-agents (Forge, Engineer), custom skills (Interceptor, Browser), voice notifications, identity files — those are **personal-config concerns**, not repo policy. Keep them in your global `~/.claude/CLAUDE.md` (or PAI's `USER/` tree), not here. Anything in this repo's tree must work for any Claude Code user, not just one operator's configuration.
+Operator note: personal tooling (PAI sub-agents, custom skills, voice routing, ElevenLabs voice IDs) stays in your global `~/.claude/CLAUDE.md` (or PAI's `USER/` tree), not in this repo. Anything in this repo's tree must work for any Claude Code user, not just one operator's configuration.
