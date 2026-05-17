@@ -56,7 +56,23 @@ function redactUrl(raw: string): string {
 // or "incident"; the strict suffix-with-underscore regex below avoids
 // false positives.
 const TEST_DB_NAME = /^[a-z][a-z0-9_]*_(test|ci)$/i;
-const dbName = url.split("/").pop()?.split("?")[0] ?? "";
+
+// Parse the URL properly to get the DB name. String-splitting on `/` would
+// extract `user:password@host:5432` from a path-less URL like
+// `postgresql://user:pw@host:5432` and the dbName would then carry
+// credentials into log output even though redactUrl() redacts the URL
+// itself. `.pathname` returns "/cmdb_test" for the well-formed case and
+// the empty string when there's no path — strip the leading slash.
+function parseDbName(raw: string): string {
+  try {
+    const pathname = new URL(raw).pathname;
+    return pathname.replace(/^\//, "");
+  } catch {
+    return "";
+  }
+}
+
+const dbName = parseDbName(url);
 const looksLikeTestDb = TEST_DB_NAME.test(dbName);
 const explicitOverride = process.env.CMDB_ALLOW_DESTRUCTIVE_RESET === "1";
 
