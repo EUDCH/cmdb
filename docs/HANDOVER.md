@@ -1,7 +1,6 @@
 # Handover
 
 > This document is the **single source of truth** for running the CMDB. If another OPERAS sysadmin needs to take over (planned handover, holiday cover, bus-factor event), everything they need to deploy, operate, and recover the system must be here.
-
 > Draft skeleton — populated as the system gains substance.
 
 ## TL;DR

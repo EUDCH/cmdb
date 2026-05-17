@@ -28,8 +28,20 @@ jobs:
           bun-version: latest
           cache: true
       - run: bun install --frozen-lockfile
-      - run: bun run check
-      - run: bun run typecheck
+      - name: TypeScript & Astro type-check
+        run: bun run check
+      - name: TypeScript type-check
+        run: bun run typecheck
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3
+        with:
+          dockerfile: Dockerfile
+      - name: Lint YAML
+        uses: ibiqlik/action-yamllint@v3
+      - name: Lint Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: "**/*.md"
 
   build:
     name: Build
