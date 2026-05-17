@@ -51,7 +51,7 @@ jobs:
         # Globs + ignores live in .markdownlint-cli2.yaml so the action
         # discovers them via the standard config-file convention; passing
         # `globs:` here would override that and bypass the ignores list.
-        uses: DavidAnson/markdownlint-cli2-action@v17
+        uses: DavidAnson/markdownlint-cli2-action@v23
 
   build:
     name: Build
