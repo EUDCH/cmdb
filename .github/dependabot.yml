@@ -1,0 +1,63 @@
+# Dependabot — weekly dependency refresh PRs.
+#
+# Two ecosystems are tracked:
+#
+#   - `bun`  → keeps app/test deps in package.json + bun.lock fresh.
+#              Dependabot reads bun.lock natively (added 2025).
+#   - `github-actions` → keeps action pins in .github/workflows/ci.yml
+#              fresh (hadolint/hadolint-action, actions/checkout, etc.).
+#              These drift silently otherwise.
+#
+# PRs land under `chore(deps)` (bun) and `chore(ci)` (gh-actions), get the
+# standard CI gates, and follow the same merge ceremony as any other PR
+# (AGENTS.md → Change ceremony). Maintainer reviews + merges; agents do
+# not self-merge Dependabot PRs.
+#
+# Grouping: related deps that always upgrade together (or break in
+# isolation) are grouped into single PRs to cut review noise. New groups
+# can be added when patterns emerge.
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    commit-message:
+      # `prefix` already carries the "deps" scope; do NOT add `include: "scope"`
+      # — Dependabot would then append the ecosystem name, producing malformed
+      # titles like `chore(deps)(bun): bump astro` (two scopes is not valid
+      # Conventional Commits). Single scope `chore(deps): bump astro …` matches
+      # the AGENTS.md ceremony.
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+    groups:
+      astro:
+        patterns:
+          - "astro"
+          - "@astrojs/*"
+      drizzle:
+        patterns:
+          - "drizzle-orm"
+          - "drizzle-kit"
+      types:
+        patterns:
+          - "@types/*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "ci"
+      - "dependencies"
