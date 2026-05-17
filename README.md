@@ -70,6 +70,26 @@ The app is gated by middleware. Two modes (see [`docs/adr/0003-auth.md`](docs/ad
 
 Routes: `/auth/login`, `/auth/callback`, `/auth/logout`. Sessions live in an HMAC-signed `HttpOnly` cookie with a 12 h TTL.
 
+## Branding
+
+Visual identity follows Athina's canonical *Brand Sheet EDCH.pdf*:
+
+- **Palette** — primary `#355BA9`, plus eight component accents (`#8475B6`, `#F05D89`, `#FCB316`, `#87C540`, `#00A666`, `#EF4136`, `#F47721`, `#16C1F3`). Exposed as CSS custom properties on `:root` in `src/layouts/Base.astro`.
+- **Typography** — Barlow (400 / 500 / 600 / 700), loaded from Google Fonts.
+- **Lifecycle pills** — each `lifecycle_state` maps to a brand accent (`planned`=violet, `staging`=amber, `production`=teal, `deprecated`=orange, `retired`=muted).
+
+### Known limitation — placeholder logo
+
+`public/edch-wordmark.svg` is a **placeholder**: a typographic "EDCH" wordmark rendered in Barlow Bold at the primary blue. The EDCH brand-asset folder on Drive holds only the Brand Sheet PDF + three brochure variants — no master logo SVG or high-resolution PNG.
+
+To replace with the canonical master logo:
+
+1. Get the source SVG (or Illustrator file) from Athina (`athina.papadopoulou@operas-eu.org`, EDCH communications officer).
+2. Drop it at `public/edch-logo.svg` (or `public/edch-logo.png`).
+3. Swap the `<img src="/edch-wordmark.svg">` reference in `src/layouts/Base.astro` to point at the new asset.
+
+Until then the wordmark is brand-faithful in colour + typeface and ships immediately rather than blocking on Athina.
+
 ## Documents
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — high-level architecture, data model overview, integration points
