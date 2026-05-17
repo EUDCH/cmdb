@@ -68,9 +68,12 @@ jobs:
         env:
           # Astro SSR imports src/lib/db.ts and src/lib/session.ts at build
           # time. Both throw at module-import if their env is missing — the
-          # placeholders here keep the build green without touching prod
-          # secrets. CI never connects to the DB; the URL is structural.
-          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://ci:ci@localhost:5432/ci' }}
+          # structural placeholders below keep the build green without any
+          # secret fallback. CI never connects to the DB; the URL is shape-
+          # only. Don't add a `${{ secrets.* }}` fallback "just in case" —
+          # that turns absence-of-secret into a silent footgun where a
+          # configured prod-ish DSN would silently flow into the build env.
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
           AUTH_MODE: dev
           SESSION_SECRET: ci-placeholder-secret-32-bytes-minimum-________
 
