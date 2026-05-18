@@ -1,0 +1,99 @@
+---
+import Base from "~/layouts/Base.astro";
+import { asc } from "drizzle-orm";
+import { db } from "~/lib/db";
+import { service } from "@db/schema";
+import {
+  aggregateSecurityContacts,
+  mailtoForAddress,
+} from "~/lib/security-contacts";
+
+const rows = await db.select().from(service).orderBy(asc(service.name));
+const { withContacts, flatUnique, mailtoAll } = aggregateSecurityContacts(rows);
+---
+<Base title="Security contacts">
+  <h2>Security contacts</h2>
+  <p class="muted">
+    Aggregated security contacts across every service in inventory. Use the
+    flat deduped list to fan out a coordinated security disclosure; use the
+    per-service breakdown to scope a single-service notice.
+  </p>
+
+  {withContacts.length === 0 ? (
+    <p>No services have security contacts configured yet.</p>
+  ) : (
+    <>
+      <section id="flat-list">
+        <h3>Flat unique list ({flatUnique.length})</h3>
+        <p class="muted">Deduped across all services. Each address links to a single-recipient mailto; the button opens a draft addressed to every contact via BCC so recipients aren't disclosed to each other.</p>
+        <ul>
+          {flatUnique.map((email) => (
+            <li><a href={mailtoForAddress(email)}>{email}</a></li>
+          ))}
+        </ul>
+        {mailtoAll && (
+          <p><a class="mailto-all" href={mailtoAll}>Compose to all (BCC)</a></p>
+        )}
+      </section>
+
+      <section id="per-service">
+        <h3>Per service ({withContacts.length})</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Source</th>
+              <th>Contacts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {withContacts.map((s) => (
+              <tr>
+                <td><strong>{s.name}</strong></td>
+                <td>{s.source ? <span class={`pill-source ${s.source}`}>{s.source}</span> : <span class="muted">—</span>}</td>
+                <td>
+                  <ul class="contact-list">
+                    {s.contacts.map((email) => (
+                      <li><a href={mailtoForAddress(email)}>{email}</a></li>
+                    ))}
+                  </ul>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </>
+  )}
+
+  <style>
+    section { margin-top: 1.5rem; }
+    section h3 { color: var(--accent); margin-bottom: 0.4rem; }
+    .contact-list { margin: 0; padding-left: 1rem; }
+    .mailto-all {
+      display: inline-block;
+      padding: 0.4rem 0.9rem;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .mailto-all:hover { background: var(--edch-violet); }
+    /* `vetted` = audited by maintainer; `default` = auto-populated from technical
+       contact, needs review. Both pills use dark text on a coloured background
+       so contrast stays above WCAG AA 4.5:1 at this 0.75rem size — white on
+       --edch-teal sits at ~3.2:1 and fails. */
+    .pill-source {
+      display: inline-block;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .pill-source.vetted  { background: var(--edch-teal);  color: #1a1a1a; }
+    .pill-source.default { background: var(--edch-amber); color: #1a1a1a; }
+  </style>
+</Base>
