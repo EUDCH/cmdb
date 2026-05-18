@@ -1,0 +1,138 @@
+---
+import Base from "~/layouts/Base.astro";
+import { asc } from "drizzle-orm";
+import { db } from "~/lib/db";
+import { service } from "@db/schema";
+
+const rows = await db.select().from(service).orderBy(asc(service.name));
+
+// Narrow `metadata` at the boundary — JSONB columns are typed `unknown` to us.
+// componentOf() in src/pages/services/index.astro uses the same shape; the
+// duplication is intentional until a third reader of metadata appears.
+function securityContactsOf(metadata: unknown): string[] {
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    "security_contacts" in metadata &&
+    Array.isArray((metadata as { security_contacts: unknown }).security_contacts)
+  ) {
+    return (metadata as { security_contacts: unknown[] }).security_contacts.filter(
+      (e): e is string => typeof e === "string" && e.length > 0,
+    );
+  }
+  return [];
+}
+
+function securityContactsSourceOf(metadata: unknown): string | null {
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    "security_contacts_source" in metadata &&
+    typeof (metadata as { security_contacts_source: unknown }).security_contacts_source === "string"
+  ) {
+    return (metadata as { security_contacts_source: string }).security_contacts_source;
+  }
+  return null;
+}
+
+type ServiceWithContacts = {
+  name: string;
+  source: string | null;
+  contacts: string[];
+};
+
+const withContacts: ServiceWithContacts[] = rows
+  .map((s) => ({
+    name: s.name,
+    source: securityContactsSourceOf(s.metadata),
+    contacts: securityContactsOf(s.metadata),
+  }))
+  .filter((s) => s.contacts.length > 0);
+
+const flatUnique = [...new Set(withContacts.flatMap((s) => s.contacts))].sort();
+const mailtoAll = flatUnique.length > 0 ? `mailto:?bcc=${flatUnique.join(",")}` : null;
+---
+<Base title="Security contacts">
+  <h2>Security contacts</h2>
+  <p class="muted">
+    Aggregated security contacts across every service in inventory. Use the
+    flat deduped list to fan out a coordinated security disclosure; use the
+    per-service breakdown to scope a single-service notice.
+  </p>
+
+  {withContacts.length === 0 ? (
+    <p>No services have security contacts configured yet.</p>
+  ) : (
+    <>
+      <section>
+        <h3>Flat unique list ({flatUnique.length})</h3>
+        <p class="muted">Deduped across all services. Each address links to a single-recipient mailto; the button opens a draft addressed to every contact via BCC so recipients aren't disclosed to each other.</p>
+        <ul>
+          {flatUnique.map((email) => (
+            <li><a href={`mailto:${email}`}>{email}</a></li>
+          ))}
+        </ul>
+        {mailtoAll && (
+          <p><a class="mailto-all" href={mailtoAll}>Compose to all (BCC)</a></p>
+        )}
+      </section>
+
+      <section>
+        <h3>Per service ({withContacts.length})</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Source</th>
+              <th>Contacts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {withContacts.map((s) => (
+              <tr>
+                <td><strong>{s.name}</strong></td>
+                <td>{s.source ? <span class={`pill-source ${s.source}`}>{s.source}</span> : <span class="muted">—</span>}</td>
+                <td>
+                  <ul class="contact-list">
+                    {s.contacts.map((email) => (
+                      <li><a href={`mailto:${email}`}>{email}</a></li>
+                    ))}
+                  </ul>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </>
+  )}
+
+  <style>
+    section { margin-top: 1.5rem; }
+    section h3 { color: var(--accent); margin-bottom: 0.4rem; }
+    .contact-list { margin: 0; padding-left: 1rem; }
+    .mailto-all {
+      display: inline-block;
+      padding: 0.4rem 0.9rem;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .mailto-all:hover { background: var(--edch-violet); }
+    /* `vetted` = audited by maintainer; `default` = auto-populated from technical
+       contact, needs review. Visual contrast intentional. */
+    .pill-source {
+      display: inline-block;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .pill-source.vetted  { background: var(--edch-teal);   color: white; }
+    .pill-source.default { background: var(--edch-amber);  color: #1a1a1a; }
+  </style>
+</Base>

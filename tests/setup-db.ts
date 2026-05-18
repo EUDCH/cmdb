@@ -11,9 +11,11 @@
  * demo data and will grow over time).
  *
  * Fixture: 1 owner, 3 services (one per relevant lifecycle state), 2 hosts,
- * 1 dependency. Adjust deliberately when a test needs new coverage; if you
- * find yourself adding rows just to make an assertion pass, the assertion
- * is testing the wrong thing.
+ * 1 dependency. Two of the three services carry `security_contacts` metadata
+ * (with an intentional overlap to exercise dedup); the third has NULL
+ * metadata to exercise the without-contacts path. Adjust deliberately when
+ * a test needs new coverage; if you find yourself adding rows just to make
+ * an assertion pass, the assertion is testing the wrong thing.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -142,11 +144,17 @@ async function main() {
       ('33333333-3333-3333-3333-333333333331', 'edch', 'Test Alpha',
        'Production fixture service.', 'production',
        '11111111-1111-1111-1111-111111111111',
-       '{"component": "Forum & Registry"}'::jsonb),
+       '{"component": "Forum & Registry",
+         "security_contacts": ["alpha-security@example.invalid",
+                               "shared-security@example.invalid"],
+         "security_contacts_source": "default"}'::jsonb),
       ('33333333-3333-3333-3333-333333333332', 'edch', 'Test Bravo',
        'Staging fixture service.', 'staging',
        '11111111-1111-1111-1111-111111111111',
-       '{"component": "Diamond Discovery Hub"}'::jsonb),
+       '{"component": "Diamond Discovery Hub",
+         "security_contacts": ["bravo-security@example.invalid",
+                               "shared-security@example.invalid"],
+         "security_contacts_source": "vetted"}'::jsonb),
       ('33333333-3333-3333-3333-333333333333', 'edch', 'Test Charlie',
        'Planned fixture service, no component.', 'planned',
        '11111111-1111-1111-1111-111111111111', NULL)
