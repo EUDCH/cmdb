@@ -3,54 +3,13 @@ import Base from "~/layouts/Base.astro";
 import { asc } from "drizzle-orm";
 import { db } from "~/lib/db";
 import { service } from "@db/schema";
+import {
+  aggregateSecurityContacts,
+  mailtoForAddress,
+} from "~/lib/security-contacts";
 
 const rows = await db.select().from(service).orderBy(asc(service.name));
-
-// Narrow `metadata` at the boundary — JSONB columns are typed `unknown` to us.
-// componentOf() in src/pages/services/index.astro uses the same shape; the
-// duplication is intentional until a third reader of metadata appears.
-function securityContactsOf(metadata: unknown): string[] {
-  if (
-    metadata &&
-    typeof metadata === "object" &&
-    "security_contacts" in metadata &&
-    Array.isArray((metadata as { security_contacts: unknown }).security_contacts)
-  ) {
-    return (metadata as { security_contacts: unknown[] }).security_contacts.filter(
-      (e): e is string => typeof e === "string" && e.length > 0,
-    );
-  }
-  return [];
-}
-
-function securityContactsSourceOf(metadata: unknown): string | null {
-  if (
-    metadata &&
-    typeof metadata === "object" &&
-    "security_contacts_source" in metadata &&
-    typeof (metadata as { security_contacts_source: unknown }).security_contacts_source === "string"
-  ) {
-    return (metadata as { security_contacts_source: string }).security_contacts_source;
-  }
-  return null;
-}
-
-type ServiceWithContacts = {
-  name: string;
-  source: string | null;
-  contacts: string[];
-};
-
-const withContacts: ServiceWithContacts[] = rows
-  .map((s) => ({
-    name: s.name,
-    source: securityContactsSourceOf(s.metadata),
-    contacts: securityContactsOf(s.metadata),
-  }))
-  .filter((s) => s.contacts.length > 0);
-
-const flatUnique = [...new Set(withContacts.flatMap((s) => s.contacts))].sort();
-const mailtoAll = flatUnique.length > 0 ? `mailto:?bcc=${flatUnique.join(",")}` : null;
+const { withContacts, flatUnique, mailtoAll } = aggregateSecurityContacts(rows);
 ---
 <Base title="Security contacts">
   <h2>Security contacts</h2>
@@ -64,12 +23,12 @@ const mailtoAll = flatUnique.length > 0 ? `mailto:?bcc=${flatUnique.join(",")}` 
     <p>No services have security contacts configured yet.</p>
   ) : (
     <>
-      <section>
+      <section id="flat-list">
         <h3>Flat unique list ({flatUnique.length})</h3>
         <p class="muted">Deduped across all services. Each address links to a single-recipient mailto; the button opens a draft addressed to every contact via BCC so recipients aren't disclosed to each other.</p>
         <ul>
           {flatUnique.map((email) => (
-            <li><a href={`mailto:${email}`}>{email}</a></li>
+            <li><a href={mailtoForAddress(email)}>{email}</a></li>
           ))}
         </ul>
         {mailtoAll && (
@@ -77,7 +36,7 @@ const mailtoAll = flatUnique.length > 0 ? `mailto:?bcc=${flatUnique.join(",")}` 
         )}
       </section>
 
-      <section>
+      <section id="per-service">
         <h3>Per service ({withContacts.length})</h3>
         <table>
           <thead>
@@ -95,7 +54,7 @@ const mailtoAll = flatUnique.length > 0 ? `mailto:?bcc=${flatUnique.join(",")}` 
                 <td>
                   <ul class="contact-list">
                     {s.contacts.map((email) => (
-                      <li><a href={`mailto:${email}`}>{email}</a></li>
+                      <li><a href={mailtoForAddress(email)}>{email}</a></li>
                     ))}
                   </ul>
                 </td>
@@ -122,7 +81,9 @@ const mailtoAll = flatUnique.length > 0 ? `mailto:?bcc=${flatUnique.join(",")}` 
     }
     .mailto-all:hover { background: var(--edch-violet); }
     /* `vetted` = audited by maintainer; `default` = auto-populated from technical
-       contact, needs review. Visual contrast intentional. */
+       contact, needs review. Both pills use dark text on a coloured background
+       so contrast stays above WCAG AA 4.5:1 at this 0.75rem size — white on
+       --edch-teal sits at ~3.2:1 and fails. */
     .pill-source {
       display: inline-block;
       padding: 0.15rem 0.6rem;
@@ -132,7 +93,7 @@ const mailtoAll = flatUnique.length > 0 ? `mailto:?bcc=${flatUnique.join(",")}` 
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-    .pill-source.vetted  { background: var(--edch-teal);   color: white; }
-    .pill-source.default { background: var(--edch-amber);  color: #1a1a1a; }
+    .pill-source.vetted  { background: var(--edch-teal);  color: #1a1a1a; }
+    .pill-source.default { background: var(--edch-amber); color: #1a1a1a; }
   </style>
 </Base>
