@@ -1,0 +1,127 @@
+# OPERAS CMDB — production compose stack for cmdb.edch.eu (single VM).
+#
+# Per ADR-0004:
+#   - All services on a private bridge network
+#   - Postgres NOT published on the host network; only the app reaches it
+#     via the user-defined bridge
+#   - Migration is a one-shot service; the app waits on
+#     `service_completed_successfully` — failed migration blocks the swap
+#   - Real EDCH inventory loaded out-of-band via the profile-gated `seed`
+#     service (bind-mount of /opt/cmdb/seed.local.ts — never in git)
+#   - Caddy terminates TLS on-box; Postgres data + Caddy state live in
+#     named Docker volumes
+#
+# `IMAGE_TAG` is overridden by `/opt/cmdb/deploy.sh <tag>` so a deploy
+# pins to a specific GHCR digest. The local default of `main` lets a
+# bare `docker compose pull` keep a manual recovery path open.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: cmdb-caddy
+    restart: unless-stopped
+    env_file:
+      - /opt/cmdb/.env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - /opt/cmdb/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      cmdb:
+        condition: service_started
+    networks:
+      - cmdb_net
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: cmdb-postgres
+    restart: unless-stopped
+    env_file:
+      - /opt/cmdb/.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cmdb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-cmdb}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cmdb} -d ${POSTGRES_DB:-cmdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - cmdb_net
+
+  migrate:
+    image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
+    container_name: cmdb-migrate
+    # One-shot: run to completion, do NOT restart. A failed migration must
+    # remain visible (exit non-zero) rather than silently retry — the app
+    # service's `service_completed_successfully` dependency keeps the
+    # previous container serving until migrate succeeds.
+    restart: "no"
+    env_file:
+      - /opt/cmdb/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["bun", "run", "db/migrate.ts"]
+    networks:
+      - cmdb_net
+
+  cmdb:
+    image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
+    container_name: cmdb-app
+    restart: unless-stopped
+    env_file:
+      - /opt/cmdb/.env
+    environment:
+      BUILD_SHA: ${IMAGE_TAG:-main}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - cmdb_net
+
+  # Profile-gated one-shot. Invoked only by an operator with a real
+  # /opt/cmdb/seed.local.ts file on the VM:
+  #
+  #   docker compose --profile seed run --rm seed
+  #
+  # Real EDCH inventory is never in git; the file is scp'd to the VM
+  # out-of-band and bind-mounted at runtime. The placeholder default
+  # path on the VM is a no-op script the operator overwrites once.
+  seed:
+    image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
+    profiles: ["seed"]
+    env_file:
+      - /opt/cmdb/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - /opt/cmdb/seed.local.ts:/app/db/seed.local.ts:ro
+    command: ["bun", "run", "db/seed.local.ts"]
+    networks:
+      - cmdb_net
+
+volumes:
+  postgres_data:
+    name: cmdb_postgres_data
+  caddy_data:
+    name: cmdb_caddy_data
+  caddy_config:
+    name: cmdb_caddy_config
+
+networks:
+  cmdb_net:
+    name: cmdb_net
+    driver: bridge

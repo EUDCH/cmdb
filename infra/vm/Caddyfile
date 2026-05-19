@@ -1,0 +1,25 @@
+# Caddy v2 — TLS termination + reverse proxy for the CMDB.
+#
+# Env vars resolved at startup from /opt/cmdb/.env via the compose file's
+# env_file: block.
+
+{
+	# ACME contact for Let's Encrypt renewal warnings. Caddy uses HTTP-01
+	# by default; ports 80 + 443 must be publicly reachable.
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	log {
+		output stdout
+		format json
+	}
+
+	reverse_proxy cmdb:4321 {
+		header_up Host {host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
