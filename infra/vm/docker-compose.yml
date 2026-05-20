@@ -42,12 +42,14 @@ services:
     networks:
       - cmdb_net
 
+  # Postgres receives only the three POSTGRES_* vars it needs — no shared
+  # env_file, so SESSION_SECRET / GHCR_TOKEN / OIDC_* never enter the DB
+  # container. Values interpolate from /opt/cmdb/.env via compose's
+  # standard same-dir mechanism.
   postgres:
     image: postgres:17-alpine
     container_name: cmdb-postgres
     restart: unless-stopped
-    env_file:
-      - /opt/cmdb/.env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cmdb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -62,16 +64,17 @@ services:
     networks:
       - cmdb_net
 
+  # One-shot migrate runs to completion (`restart: "no"`). A failed
+  # migration stays visible — the app service's
+  # `service_completed_successfully` gate keeps the previous container
+  # serving until migrate succeeds. Only DATABASE_URL is needed; no
+  # shared env_file.
   migrate:
     image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
     container_name: cmdb-migrate
-    # One-shot: run to completion, do NOT restart. A failed migration must
-    # remain visible (exit non-zero) rather than silently retry — the app
-    # service's `service_completed_successfully` dependency keeps the
-    # previous container serving until migrate succeeds.
     restart: "no"
-    env_file:
-      - /opt/cmdb/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,13 +82,21 @@ services:
     networks:
       - cmdb_net
 
+  # The app container gets only the runtime vars it actually reads.
+  # GHCR_USER / GHCR_TOKEN stay on the VM host (consumed by bootstrap.sh
+  # for `docker login`) and never enter the public-facing container.
   cmdb:
     image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
     container_name: cmdb-app
     restart: unless-stopped
-    env_file:
-      - /opt/cmdb/.env
     environment:
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_MODE: ${AUTH_MODE}
+      SESSION_SECRET: ${SESSION_SECRET}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
       BUILD_SHA: ${IMAGE_TAG:-main}
     depends_on:
       postgres:
@@ -101,13 +112,12 @@ services:
   #   docker compose --profile seed run --rm seed
   #
   # Real EDCH inventory is never in git; the file is scp'd to the VM
-  # out-of-band and bind-mounted at runtime. The placeholder default
-  # path on the VM is a no-op script the operator overwrites once.
+  # out-of-band and bind-mounted at runtime. Only DATABASE_URL is needed.
   seed:
     image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
     profiles: ["seed"]
-    env_file:
-      - /opt/cmdb/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       postgres:
         condition: service_healthy

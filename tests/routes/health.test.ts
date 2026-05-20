@@ -12,8 +12,9 @@
  *
  * The 503 (db down) path is not exercised here — taking the DB down
  * mid-suite would break the rest of the integration tests. The branch
- * is covered by the route's structure (catch → 503) and proven in
- * production by the deploy script's rollback path on first failure.
+ * is covered by the route's structure (catch → 503); in production the
+ * deploy script's auto-rollback path treats sustained non-200 as the
+ * trigger to re-up the previous IMAGE_TAG.
  */
 import { describe, expect, test } from "bun:test";
 

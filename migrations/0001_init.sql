@@ -8,11 +8,15 @@
 -- here as a Postgres ENUM type. v2 will add additional namespaces via
 -- `ALTER TYPE namespace_kind ADD VALUE 'operas'` — additive, no schema rewrite.
 --
--- Transaction boundary: the migration runner (db/migrate.ts) wraps each
--- file in `sql.begin(...)`. Do NOT add `BEGIN; … COMMIT;` here — nested
--- top-level transactions corrupt the runner's rollback semantics.
--- (tests/setup-db.ts also applies this file inside its own transaction
--- harness.)
+-- Transaction boundary: the production migration runner
+-- (db/migrate.ts) wraps each file in `sql.begin(...)`, so any failed
+-- DDL statement here rolls back atomically. Do NOT add
+-- `BEGIN; … COMMIT;` at the top level of this file — that would nest a
+-- transaction inside the runner's and corrupt its rollback semantics.
+-- The test harness (tests/setup-db.ts) applies migrations via
+-- `sql.unsafe(...)` in autocommit mode (no surrounding transaction);
+-- the schema DDL is idempotent enough that autocommit application is
+-- fine there.
 
 -- =============================================================================
 -- Enums

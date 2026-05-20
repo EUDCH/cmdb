@@ -12,7 +12,9 @@ EDCH CMDB v1 (Phase 1) runs on a single Ubuntu 24.04 VM at `cmdb.edch.eu` (IN2P3
 
 **Architecture:** see [`adr/0004-deployment.md`](adr/0004-deployment.md). Four containers on a private bridge — `caddy`, `postgres`, `migrate` (one-shot), `cmdb` — plus an opt-in `seed` profile for loading real inventory.
 
-**Deploy contract:** GitHub Actions builds the multi-stage `Dockerfile`, pushes `ghcr.io/eudch/cmdb:<sha>` + `:main`, then `ssh`es to the VM and invokes `/opt/cmdb/deploy.sh <sha>`. The script pulls the new image, runs `migrate` to completion, swaps the `cmdb` container, polls `/health`, and rolls back on failure. The docker socket never leaves the VM.
+**Deploy contract:** GitHub Actions builds the multi-stage `Dockerfile`, pushes `ghcr.io/eudch/cmdb:<sha>` + `:main`, then `ssh`es to the VM and invokes `/opt/cmdb/deploy.sh <sha>`. The script pulls the new image, runs `migrate` to completion, swaps the `cmdb` container, and polls `/health` over HTTPS. On sustained `/health` failure it attempts an auto-rollback by re-upping the `cmdb` container at the previously-recorded `IMAGE_TAG`, re-probing for 30 s, and exiting non-zero either way so CI marks the run failed. If no previous tag is recorded (very first deploy on this VM) or the rollback re-probe also fails, the script logs that manual recovery is required and exits 1 — Phase 2 will add alerting on top of this. The docker socket never leaves the VM.
+
+**Rollback / redeploy of an existing image:** trigger the `Deploy` workflow via `workflow_dispatch` with `tag` set to the target SHA. The workflow skips build + push when `tag` is provided and only invokes `deploy.sh <tag>` over SSH, preserving the immutable-SHA contract (a historical tag is never overwritten). Equivalently, `ssh cmdb-vm /opt/cmdb/deploy.sh <previous-sha>` from a maintainer workstation.
 
 **Bootstrap (one-time):**
 

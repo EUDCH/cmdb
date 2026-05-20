@@ -13,7 +13,8 @@ set -euo pipefail
 
 TAG="${1:-main}"
 APP_DIR="/opt/cmdb"
-HEALTH_TIMEOUT=90   # seconds to wait for /health 200 before rollback
+HEALTH_TIMEOUT=90       # seconds to wait for /health 200 before rolling back
+ROLLBACK_TIMEOUT=30     # seconds to wait for /health 200 after rollback swap
 
 cd "${APP_DIR}"
 
@@ -94,8 +95,47 @@ while true; do
   if (( $(date +%s) > deadline )); then
     echo "[deploy] FAIL: /health did not return 200 within ${HEALTH_TIMEOUT}s (last HTTP ${last_code})"
     echo "[deploy] .env still pinned at IMAGE_TAG=${PREV_TAG:-(unset)}"
-    echo "[deploy] rollback hint: re-run with the previous tag:"
-    echo "[deploy]   /opt/cmdb/deploy.sh <previous-sha>"
+
+    # Auto-rollback: re-up the cmdb container at PREV_TAG so a broken
+    # release does not keep serving while we wait for the operator.
+    # Only attempted when a previous tag is known (i.e. not the very
+    # first deploy on this VM); if none, the failed container stays
+    # running and the operator has to recover by hand.
+    if [[ -z "${PREV_TAG}" ]]; then
+      echo "[deploy] no previous tag recorded in .env — cannot auto-rollback"
+      echo "[deploy] manual recovery required: choose a known-good tag and re-run /opt/cmdb/deploy.sh <tag>"
+      exit 1
+    fi
+
+    if [[ "${PREV_TAG}" == "${TAG}" ]]; then
+      echo "[deploy] previous tag matches the failed tag (${TAG}); no rollback target available"
+      echo "[deploy] manual recovery required"
+      exit 1
+    fi
+
+    echo "[deploy] attempting auto-rollback to IMAGE_TAG=${PREV_TAG}"
+    if ! IMAGE_TAG="${PREV_TAG}" docker compose up -d --no-deps cmdb; then
+      echo "[deploy] FAIL: rollback compose up returned non-zero"
+      echo "[deploy] manual recovery required"
+      exit 1
+    fi
+
+    rollback_deadline=$(( $(date +%s) + ROLLBACK_TIMEOUT ))
+    rollback_code="000"
+    while (( $(date +%s) < rollback_deadline )); do
+      rollback_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        --resolve "${DOMAIN}:443:127.0.0.1" \
+        "${HEALTH_URL}" || echo "000")
+      if [[ "${rollback_code}" == "200" ]]; then
+        echo "[deploy] auto-rollback to ${PREV_TAG} verified — /health 200"
+        echo "[deploy] .env still pinned at IMAGE_TAG=${PREV_TAG} (rollback target was the recorded tag)"
+        exit 1   # the requested deploy still failed; surface non-zero to CI
+      fi
+      sleep 2
+    done
+
+    echo "[deploy] FAIL: auto-rollback to ${PREV_TAG} did not return /health 200 within ${ROLLBACK_TIMEOUT}s (last HTTP ${rollback_code})"
+    echo "[deploy] manual recovery required: VM is in a degraded state — ssh in and inspect"
     exit 1
   fi
   sleep 2

@@ -5,8 +5,10 @@
  *   { status: "ok" | "degraded", version: <git-sha-or-unknown>, db: "ok" | "down" }
  *
  * 200 when DB is reachable, 503 when it isn't. The deploy script polls
- * this after `up -d cmdb` and rolls back on failure; an external monitor
- * (Phase 2) probes the same endpoint over HTTPS through Caddy.
+ * this after `up -d cmdb`; on sustained non-200 it attempts an
+ * auto-rollback to the previously-recorded IMAGE_TAG (when one exists)
+ * and exits non-zero. An external monitor (Phase 2) probes the same
+ * endpoint over HTTPS through Caddy.
  *
  * Version is read from the BUILD_SHA env var that the deploy workflow
  * sets to the current commit SHA. Falls back to "unknown" so the route

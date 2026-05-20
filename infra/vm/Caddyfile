@@ -1,7 +1,10 @@
 # Caddy v2 — TLS termination + reverse proxy for the CMDB.
 #
-# Env vars resolved at startup from /opt/cmdb/.env via the compose file's
-# env_file: block.
+# DOMAIN and ACME_EMAIL are passed into the container via the compose
+# file's `environment:` block (scoped to just these two vars — no
+# shared env_file, so app secrets like SESSION_SECRET / GHCR_TOKEN
+# never enter the public-facing proxy). The values are interpolated
+# from /opt/cmdb/.env at the compose CLI layer.
 
 {
 	# ACME contact for Let's Encrypt renewal warnings. Caddy uses HTTP-01
