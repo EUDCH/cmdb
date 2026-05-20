@@ -13,23 +13,37 @@ set -euo pipefail
 
 TAG="${1:-main}"
 APP_DIR="/opt/cmdb"
-HEALTH_URL="http://127.0.0.1/health"
-HEALTH_TIMEOUT=60   # seconds to wait for /health 200 before rollback
+HEALTH_TIMEOUT=90   # seconds to wait for /health 200 before rollback
 
 cd "${APP_DIR}"
 
-echo "[deploy] tag=${TAG}"
-echo "[deploy] previous IMAGE_TAG (from .env if set):"
-grep -E "^IMAGE_TAG=" .env || echo "  (none)"
+# Source .env so DOMAIN (and friends) are available to this script's own
+# probe. The compose CLI reads .env automatically for service interpolation,
+# but this script also needs DOMAIN for the HTTPS health probe below.
+if [[ ! -f .env ]]; then
+  echo "[deploy] FAIL: ${APP_DIR}/.env missing — run bootstrap.sh first"
+  exit 1
+fi
+set -a
+# shellcheck disable=SC1091
+source ./.env
+set +a
 
-# Persist the new tag into .env so a manual `docker compose pull` or a
-# VM reboot picks the same image we just deployed.
+DOMAIN="${DOMAIN:?DOMAIN must be set in /opt/cmdb/.env}"
+HEALTH_URL="https://${DOMAIN}/health"
+
+# Capture the currently-deployed tag so we can roll it back in .env if
+# this deploy fails after we've started touching state. The .env value
+# only gets rewritten after /health 200 confirms the new image works.
+PREV_TAG=""
 if grep -qE "^IMAGE_TAG=" .env; then
-  sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${TAG}|" .env
-else
-  echo "IMAGE_TAG=${TAG}" >> .env
+  PREV_TAG="$(grep -E "^IMAGE_TAG=" .env | head -1 | cut -d= -f2-)"
 fi
 
+echo "[deploy] tag=${TAG} prev=${PREV_TAG:-(none)}"
+
+# IMAGE_TAG is exported only for compose pull/run below; the .env file
+# stays untouched until the new tag is verified healthy.
 export IMAGE_TAG="${TAG}"
 
 echo "[deploy] pulling ghcr.io/eudch/cmdb:${TAG}"
@@ -43,6 +57,7 @@ echo "[deploy] running migrations"
 if ! docker compose run --rm migrate; then
   echo "[deploy] FAIL: migrate exited non-zero"
   echo "[deploy] previous cmdb container is still serving; no swap performed"
+  echo "[deploy] .env still pinned at IMAGE_TAG=${PREV_TAG:-(unset)}"
   echo "[deploy] rollback hint: re-run with the previous tag once migrate is fixed:"
   echo "[deploy]   /opt/cmdb/deploy.sh <previous-sha>"
   exit 1
@@ -51,22 +66,34 @@ fi
 echo "[deploy] migrate ok — swapping cmdb container"
 docker compose up -d --no-deps cmdb
 
-# Poll /health from inside the VM (the caddy container reverse-proxies
-# to the cmdb container on the private bridge). We probe via the public
-# caddy listener so a TLS / vhost regression also surfaces here.
+# Poll /health via the public caddy listener so a TLS or vhost regression
+# also surfaces here. `--resolve` pins the DNS lookup to the local caddy
+# instance so the probe works even when public DNS hasn't propagated yet,
+# without disabling TLS verification (no `-k`).
 echo "[deploy] polling ${HEALTH_URL} (timeout ${HEALTH_TIMEOUT}s)"
 deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
+last_code="000"
 while true; do
-  http_code=$(curl -sk -o /dev/null -w "%{http_code}" -H "Host: ${DOMAIN:-cmdb.edch.eu}" "${HEALTH_URL}" || echo "000")
-  if [[ "${http_code}" == "200" ]]; then
+  last_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    --resolve "${DOMAIN}:443:127.0.0.1" \
+    "${HEALTH_URL}" || echo "000")
+  if [[ "${last_code}" == "200" ]]; then
     echo "[deploy] /health 200 — deploy verified"
+    # Only now persist the new tag so a manual `docker compose pull` or a
+    # VM reboot picks the verified image, not an unverified rollback target.
+    if grep -qE "^IMAGE_TAG=" .env; then
+      sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${TAG}|" .env
+    else
+      echo "IMAGE_TAG=${TAG}" >> .env
+    fi
     docker compose up -d --remove-orphans
     docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/EUDCH/cmdb" >/dev/null || true
     echo "[deploy] done"
     exit 0
   fi
   if (( $(date +%s) > deadline )); then
-    echo "[deploy] FAIL: /health did not return 200 within ${HEALTH_TIMEOUT}s (last HTTP ${http_code})"
+    echo "[deploy] FAIL: /health did not return 200 within ${HEALTH_TIMEOUT}s (last HTTP ${last_code})"
+    echo "[deploy] .env still pinned at IMAGE_TAG=${PREV_TAG:-(unset)}"
     echo "[deploy] rollback hint: re-run with the previous tag:"
     echo "[deploy]   /opt/cmdb/deploy.sh <previous-sha>"
     exit 1

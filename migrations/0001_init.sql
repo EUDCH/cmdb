@@ -7,8 +7,12 @@
 -- ADR-0002 (namespace enforced at DB layer from migration 1) is implemented
 -- here as a Postgres ENUM type. v2 will add additional namespaces via
 -- `ALTER TYPE namespace_kind ADD VALUE 'operas'` — additive, no schema rewrite.
-
-BEGIN;
+--
+-- Transaction boundary: the migration runner (db/migrate.ts) wraps each
+-- file in `sql.begin(...)`. Do NOT add `BEGIN; … COMMIT;` here — nested
+-- top-level transactions corrupt the runner's rollback semantics.
+-- (tests/setup-db.ts also applies this file inside its own transaction
+-- harness.)
 
 -- =============================================================================
 -- Enums
@@ -142,5 +146,3 @@ CREATE TRIGGER service_touch_updated_at
 CREATE TRIGGER host_touch_updated_at
   BEFORE UPDATE ON host
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
-
-COMMIT;

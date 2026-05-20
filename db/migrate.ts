@@ -43,8 +43,15 @@ async function main(): Promise<void> {
   const sqlFiles = entries.filter((f) => f.endsWith(".sql")).sort();
 
   if (sqlFiles.length === 0) {
-    console.log("[migrate] no .sql files under migrations/");
-    return;
+    // Treat zero migrations as a hard failure rather than a silent
+    // success. In production this can only mean the runtime image was
+    // built without the migrations/ tree (packaging mistake) — letting
+    // /health still return 200 against an unmigrated DB would mask the
+    // breakage. Matches the loud-failure stance of tests/setup-db.ts.
+    throw new Error(
+      `[migrate] no .sql files under ${MIGRATIONS_DIR} — refusing to declare success.\n` +
+        "  If this is intentional, drop a sentinel 'noop' migration; do not exit 0.",
+    );
   }
 
   const appliedRows = await sql<{ filename: string }[]>`

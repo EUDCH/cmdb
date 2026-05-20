@@ -20,8 +20,14 @@ services:
     image: caddy:2-alpine
     container_name: cmdb-caddy
     restart: unless-stopped
-    env_file:
-      - /opt/cmdb/.env
+    # Caddy gets only the two vars it needs — DOMAIN for the vhost block,
+    # ACME_EMAIL for Let's Encrypt registration. The app's secrets
+    # (DB creds, SESSION_SECRET, GHCR_TOKEN, …) never enter this container.
+    # Values interpolate from /opt/cmdb/.env via compose's standard .env
+    # mechanism (same directory as this compose file).
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
     ports:
       - "80:80"
       - "443:443"

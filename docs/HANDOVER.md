@@ -17,8 +17,10 @@ EDCH CMDB v1 (Phase 1) runs on a single Ubuntu 24.04 VM at `cmdb.edch.eu` (IN2P3
 **Bootstrap (one-time):**
 
 ```sh
-# On a maintainer workstation, push infra to the VM:
-rsync -av --chmod=F644 infra/vm/ ubuntu@cmdb.edch.eu:/opt/cmdb/
+# On a maintainer workstation, push infra to the VM. Preserve perms
+# so bootstrap.sh + deploy.sh keep their executable bit (rsync default
+# `-a` does this; do NOT add `--chmod=F644` — it strips +x).
+rsync -av infra/vm/ ubuntu@cmdb.edch.eu:/opt/cmdb/
 
 # On the VM (one-time, after `.env` is filled in out-of-band):
 sudo /opt/cmdb/bootstrap.sh
@@ -40,7 +42,7 @@ ssh cmdb-vm /opt/cmdb/deploy.sh <previous-sha>
 
 **Configuration files (on the VM):** `/opt/cmdb/` contains exactly:
 
-- `.env` (secrets, mode 0600 root:root)
+- `.env` (secrets, mode `0600`, owner `ubuntu:ubuntu` — the user `docker compose` runs as; root-owned 0600 would block compose from reading it)
 - `docker-compose.yml` (mirror of `infra/vm/docker-compose.yml`)
 - `Caddyfile` (mirror of `infra/vm/Caddyfile`)
 - `bootstrap.sh` (one-time setup — kept for re-runs)

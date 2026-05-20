@@ -99,8 +99,13 @@ if (!looksLikeTestDb && !explicitOverride) {
   process.exit(1);
 }
 
-// max: 1 — the migration uses raw BEGIN/COMMIT; postgres-js rejects those
-// with UNSAFE_TRANSACTION when pool size > 1.
+// max: 1 — applying migrations + fixture sequentially on a single connection
+// keeps ordering deterministic and matches the production runner's pool size
+// (db/migrate.ts uses max: 1 to keep transaction semantics simple). The
+// migration files themselves no longer carry top-level BEGIN/COMMIT (the
+// production runner wraps each file in `sql.begin(...)`); setup-db.ts here
+// applies them via `sql.unsafe(...)` autocommit, which is fine for the
+// idempotent DDL the schema uses.
 const sql = postgres(url, { max: 1, onnotice: () => {} });
 
 async function main() {
