@@ -36,9 +36,11 @@ services:
       - /opt/cmdb/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on:
-      cmdb:
-        condition: service_started
+    # No `depends_on: cmdb` here on purpose: Caddy must stay independent
+    # so ACME renewals + TLS termination keep working even when the app
+    # is failing to start. Caddy will return 502 against the proxied
+    # /health while cmdb is down; the deploy script's auto-rollback path
+    # catches that case explicitly.
     networks:
       - cmdb_net
 
@@ -90,6 +92,14 @@ services:
     container_name: cmdb-app
     restart: unless-stopped
     environment:
+      # HOST + PORT pin the Astro SSR server binding so Caddy's
+      # `reverse_proxy cmdb:4321` reaches the app inside the bridge
+      # network. The runtime image already ships ENV defaults of
+      # HOST=0.0.0.0 / PORT=4321; setting them again here makes the
+      # contract visible from this file alone, so a future image rebuild
+      # that drops the ENV defaults doesn't silently break the proxy.
+      HOST: 0.0.0.0
+      PORT: 4321
       DATABASE_URL: ${DATABASE_URL}
       AUTH_MODE: ${AUTH_MODE}
       SESSION_SECRET: ${SESSION_SECRET}

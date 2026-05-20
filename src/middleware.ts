@@ -2,7 +2,10 @@ import { defineMiddleware } from "astro:middleware";
 import { decodeSession, SESSION_COOKIE } from "~/lib/session";
 import { DEV_SESSION, getAuthMode } from "~/lib/auth";
 
-const PUBLIC_PREFIXES = ["/auth/", "/_astro/", "/favicon.ico"];
+// `/health` is intentionally public: the deploy script and any external
+// monitor (Phase 2) must be able to probe it without an OIDC session.
+// Returns JSON with `{status, version, db}` per ADR-0004 § Decision.
+const PUBLIC_PREFIXES = ["/auth/", "/_astro/", "/favicon.ico", "/health"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));

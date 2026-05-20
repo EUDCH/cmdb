@@ -10,9 +10,12 @@
  * and exits non-zero. An external monitor (Phase 2) probes the same
  * endpoint over HTTPS through Caddy.
  *
- * Version is read from the BUILD_SHA env var that the deploy workflow
- * sets to the current commit SHA. Falls back to "unknown" so the route
- * stays useful in local dev where no SHA is injected.
+ * Version is read from the BUILD_SHA env var. In production the chain is:
+ * `deploy.sh` exports IMAGE_TAG → compose interpolates it into the cmdb
+ * container's `BUILD_SHA: ${IMAGE_TAG:-main}` environment → process.env
+ * here. Falls back to "unknown" so the route stays useful in local dev
+ * where no tag is injected. The route is public (see src/middleware.ts
+ * PUBLIC_PREFIXES) so deploy + monitor probes work in OIDC mode too.
  */
 import type { APIRoute } from "astro";
 import { db } from "~/lib/db";

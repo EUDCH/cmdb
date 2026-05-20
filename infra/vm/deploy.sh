@@ -16,6 +16,17 @@ APP_DIR="/opt/cmdb"
 HEALTH_TIMEOUT=90       # seconds to wait for /health 200 before rolling back
 ROLLBACK_TIMEOUT=30     # seconds to wait for /health 200 after rollback swap
 
+# TAG is taken from a positional argument (CI's SSH invocation) or from
+# the free-form `workflow_dispatch` input, then written into .env and
+# interpolated into compose image references. Reject anything that
+# isn't the literal `main` or a 7..40-char lowercase hex SHA before
+# touching state, so an accidental newline / whitespace / shell-meta
+# value can't land in .env or the compose-CLI substitution.
+if [[ ! "${TAG}" =~ ^(main|[a-f0-9]{7,40})$ ]]; then
+  echo "[deploy] FAIL: refusing deploy tag '${TAG}' — must be 'main' or a 7..40-char lowercase hex commit SHA"
+  exit 1
+fi
+
 cd "${APP_DIR}"
 
 # Source .env so DOMAIN (and friends) are available to this script's own
