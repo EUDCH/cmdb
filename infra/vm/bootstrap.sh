@@ -66,6 +66,25 @@ if [[ ! -f "${APP_DIR}/.env" ]]; then
   exit 1
 fi
 
+# .env carries POSTGRES_PASSWORD, SESSION_SECRET, and a GHCR PAT.
+# Refuse to proceed if the file is world-readable, group-readable, or
+# owned by someone other than the deploy user — any of those leaks
+# credentials to local users / services that aren't supposed to see
+# them. Mode and owner are checked separately so the FAIL message
+# names the exact mitigation.
+ENV_MODE="$(stat -c '%a' "${APP_DIR}/.env")"
+ENV_OWNER="$(stat -c '%U:%G' "${APP_DIR}/.env")"
+if [[ "${ENV_MODE}" != "600" ]]; then
+  echo "[bootstrap] FAIL: ${APP_DIR}/.env has mode ${ENV_MODE}, expected 600 (file contains POSTGRES_PASSWORD / SESSION_SECRET / GHCR_TOKEN)"
+  echo "[bootstrap]   fix: sudo chmod 0600 ${APP_DIR}/.env"
+  exit 1
+fi
+if [[ "${ENV_OWNER}" != "${DEPLOY_USER}:${DEPLOY_USER}" ]]; then
+  echo "[bootstrap] FAIL: ${APP_DIR}/.env is owned by ${ENV_OWNER}, expected ${DEPLOY_USER}:${DEPLOY_USER} (the user docker compose runs as)"
+  echo "[bootstrap]   fix: sudo chown ${DEPLOY_USER}:${DEPLOY_USER} ${APP_DIR}/.env"
+  exit 1
+fi
+
 # The compose stack + Caddy config must be on the VM before bootstrap
 # does anything irreversible. They land here via the
 # `rsync -av infra/vm/ ubuntu@cmdb.edch.eu:/opt/cmdb/` step in

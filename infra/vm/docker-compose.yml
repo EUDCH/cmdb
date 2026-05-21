@@ -76,7 +76,10 @@ services:
     container_name: cmdb-migrate
     restart: "no"
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      # DATABASE_URL is composed inline from POSTGRES_* so it cannot
+      # drift away from the credentials Postgres itself sees. The host
+      # part is the compose service name on the private bridge.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cmdb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cmdb}
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,7 +103,10 @@ services:
       # that drops the ENV defaults doesn't silently break the proxy.
       HOST: 0.0.0.0
       PORT: 4321
-      DATABASE_URL: ${DATABASE_URL}
+      # DATABASE_URL is composed inline from POSTGRES_* so it cannot
+      # drift away from the credentials Postgres itself sees. The host
+      # part is the compose service name on the private bridge.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cmdb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cmdb}
       AUTH_MODE: ${AUTH_MODE}
       SESSION_SECRET: ${SESSION_SECRET}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
@@ -132,7 +138,10 @@ services:
     image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
     profiles: ["seed"]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      # DATABASE_URL is composed inline from POSTGRES_* so it cannot
+      # drift away from the credentials Postgres itself sees. The host
+      # part is the compose service name on the private bridge.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cmdb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cmdb}
     depends_on:
       postgres:
         condition: service_healthy
