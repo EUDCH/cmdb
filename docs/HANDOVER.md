@@ -85,11 +85,14 @@ Cadence: weekly during Phase 1, ideally driven from a maintainer cron on a separ
 **Restore:**
 
 ```sh
-# On the target VM (after bootstrap has run and the stack is up):
-docker compose stop cmdb migrate
+# On the target VM (after bootstrap has run and the stack is up).
+# All `docker compose` invocations pass `-f /opt/cmdb/docker-compose.yml`
+# so they work from any cwd; a bare `docker compose ...` from the wrong
+# directory would target a different project (or fail).
+docker compose -f /opt/cmdb/docker-compose.yml stop cmdb migrate
 docker exec -i cmdb-postgres pg_restore -U cmdb -d cmdb --clean --if-exists \
   < cmdb-YYYYMMDDTHHMMSSZ.pgdump
-docker compose start cmdb
+docker compose -f /opt/cmdb/docker-compose.yml start cmdb
 ```
 
 **Restore drill (ISC-12 gate):** must be tested before declaring v1 done. Restore the latest snapshot to a freshly bootstrapped VM, verify the four canonical queries return expected counts. Until this drill has passed and is documented under the *Known Gotchas* section below, v1 is not closed.
@@ -129,7 +132,13 @@ ssh cmdb-vm docker compose -f /opt/cmdb/docker-compose.yml run --rm migrate
 ```sh
 # On a maintainer workstation with the real inventory file:
 scp db/seed.local.ts ubuntu@cmdb-vm:/opt/cmdb/seed.local.ts
-ssh cmdb-vm chmod 0640 /opt/cmdb/seed.local.ts
+# 0644 (not 0640): the bind-mounted file is read by the cmdb image's
+# `bun` user inside the container; container and host UIDs do not
+# generically match, so a 0640 file owned by `ubuntu` is typically
+# unreadable from the container and the seed silently fails. The file
+# is a script, not a credential store; SSH access to /opt/cmdb is the
+# privacy boundary on this single-user VM.
+ssh cmdb-vm chmod 0644 /opt/cmdb/seed.local.ts
 ssh cmdb-vm docker compose -f /opt/cmdb/docker-compose.yml --profile seed run --rm seed
 ```
 

@@ -123,6 +123,11 @@ services:
   #
   # Real EDCH inventory is never in git; the file is scp'd to the VM
   # out-of-band and bind-mounted at runtime. Only DATABASE_URL is needed.
+  #
+  # The host file MUST be world-readable (mode 0644) so the container's
+  # `bun` user can read it across the host/container UID gap — see the
+  # comment in bootstrap.sh next to the placeholder write for the full
+  # rationale.
   seed:
     image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
     profiles: ["seed"]

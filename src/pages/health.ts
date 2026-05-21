@@ -15,7 +15,9 @@
  * container's `BUILD_SHA: ${IMAGE_TAG:-main}` environment → process.env
  * here. Falls back to "unknown" so the route stays useful in local dev
  * where no tag is injected. The route is public (see src/middleware.ts
- * PUBLIC_PREFIXES) so deploy + monitor probes work in OIDC mode too.
+ * PUBLIC_EXACT) so deploy + monitor probes work in OIDC mode too —
+ * exact-match only, so a future `/healthz` or `/health/admin` route
+ * would NOT inherit the auth bypass.
  */
 import type { APIRoute } from "astro";
 import { db } from "~/lib/db";

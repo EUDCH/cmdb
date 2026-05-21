@@ -104,7 +104,15 @@ if [[ ! -f "${APP_DIR}/seed.local.ts" ]]; then
 console.log("seed.local.ts placeholder — no real inventory loaded.");
 PLACEHOLDER
   chown "${DEPLOY_USER}:${DEPLOY_USER}" "${APP_DIR}/seed.local.ts"
-  chmod 0640 "${APP_DIR}/seed.local.ts"
+  # Mode 0644 (not 0640): the file is bind-mounted into the seed
+  # container which runs as the image's `bun` user. Container UIDs do
+  # not generically match host UIDs, so a 0640 file owned by the
+  # deploy user is typically unreadable from inside the container and
+  # the seed run silently fails. The file is a script with no
+  # credentials in it (real EDCH inventory rows are sensitive but not
+  # secrets); SSH access to /opt/cmdb is the privacy boundary on this
+  # single-user VM.
+  chmod 0644 "${APP_DIR}/seed.local.ts"
 fi
 
 # Firewall: open 80/443 if ufw is active. Skip silently if ufw isn't installed.
