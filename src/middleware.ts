@@ -2,12 +2,18 @@ import { defineMiddleware } from "astro:middleware";
 import { decodeSession, SESSION_COOKIE } from "~/lib/session";
 import { DEV_SESSION, getAuthMode } from "~/lib/auth";
 
-// `/health` is intentionally public: the deploy script and any external
-// monitor (Phase 2) must be able to probe it without an OIDC session.
-// Returns JSON with `{status, version, db}` per ADR-0004 § Decision.
-const PUBLIC_PREFIXES = ["/auth/", "/_astro/", "/favicon.ico", "/health"];
+// Allowlist split into exact paths and prefixes to keep scope precise.
+// `/health` is exact-only: it must be probeable without OIDC by the
+// deploy script and any external monitor (Phase 2), but a future
+// `/healthz` or `/health/admin` route must NOT inherit the bypass —
+// a startsWith match would over-grant. `/favicon.ico` is exact for
+// the same reason. `/auth/` and `/_astro/` legitimately cover whole
+// subtrees, so they stay as prefixes.
+const PUBLIC_EXACT = new Set<string>(["/health", "/favicon.ico"]);
+const PUBLIC_PREFIXES = ["/auth/", "/_astro/"];
 
 function isPublic(pathname: string): boolean {
+  if (PUBLIC_EXACT.has(pathname)) return true;
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }
 

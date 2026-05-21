@@ -66,6 +66,20 @@ if [[ ! -f "${APP_DIR}/.env" ]]; then
   exit 1
 fi
 
+# The compose stack + Caddy config must be on the VM before bootstrap
+# does anything irreversible. They land here via the
+# `rsync -av infra/vm/ ubuntu@cmdb.edch.eu:/opt/cmdb/` step in
+# docs/HANDOVER.md; if they're missing the operator skipped that step
+# and the deploy would fail later anyway — surface it now with a clear
+# message.
+for required in docker-compose.yml Caddyfile; do
+  if [[ ! -f "${APP_DIR}/${required}" ]]; then
+    echo "[bootstrap] FAIL: ${APP_DIR}/${required} missing — rsync infra/vm/ to ${APP_DIR}/ from a maintainer workstation before running bootstrap"
+    echo "[bootstrap]   rsync -av infra/vm/ ubuntu@cmdb.edch.eu:${APP_DIR}/"
+    exit 1
+  fi
+done
+
 # shellcheck disable=SC1091
 set -a
 source "${APP_DIR}/.env"
@@ -104,4 +118,4 @@ else
 fi
 
 echo "[bootstrap] done"
-echo "[bootstrap] next: copy infra/vm/docker-compose.yml + Caddyfile to ${APP_DIR}/, then trigger the deploy workflow"
+echo "[bootstrap] next: trigger the Deploy workflow (push to main or workflow_dispatch) to ship the first image"
