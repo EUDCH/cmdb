@@ -93,8 +93,16 @@ jobs:
           chmod 0644 ~/.ssh/known_hosts
 
       - name: Deploy
+        # `StrictHostKeyChecking=yes` + an explicit `UserKnownHostsFile`
+        # pin host key checking to the file we just wrote from
+        # DEPLOY_KNOWN_HOSTS. Without these the runner could fall back to
+        # any pre-populated `~/.ssh/known_hosts` content (or the more
+        # lenient `accept-new` default) and silently accept a different
+        # host key, defeating the point of pinning.
         run: |
           ssh -i ~/.ssh/id_deploy \
             -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             /opt/cmdb/deploy.sh "${{ steps.tag.outputs.value }}"

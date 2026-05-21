@@ -85,8 +85,12 @@ docker compose up -d --no-deps cmdb
 echo "[deploy] polling ${HEALTH_URL} (timeout ${HEALTH_TIMEOUT}s)"
 deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
 last_code="000"
+# `--connect-timeout` bounds the TCP/TLS handshake; `--max-time` bounds
+# the entire request including the body. Without these, a stalled TLS
+# handshake could block past HEALTH_TIMEOUT and delay the rollback.
 while true; do
   last_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    --connect-timeout 5 --max-time 10 \
     --resolve "${DOMAIN}:443:127.0.0.1" \
     "${HEALTH_URL}" || echo "000")
   if [[ "${last_code}" == "200" ]]; then
@@ -135,6 +139,7 @@ while true; do
     rollback_code="000"
     while (( $(date +%s) < rollback_deadline )); do
       rollback_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        --connect-timeout 5 --max-time 10 \
         --resolve "${DOMAIN}:443:127.0.0.1" \
         "${HEALTH_URL}" || echo "000")
       if [[ "${rollback_code}" == "200" ]]; then

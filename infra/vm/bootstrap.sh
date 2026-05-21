@@ -18,10 +18,33 @@
 set -euo pipefail
 
 APP_DIR="/opt/cmdb"
-DEPLOY_USER="${SUDO_USER:-${USER}}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "[bootstrap] must run as root (use sudo)"
+  exit 1
+fi
+
+# Deploy user resolution. Priority:
+#   1. Explicit `DEPLOY_USER` env override (e.g. `sudo DEPLOY_USER=deploy /opt/cmdb/bootstrap.sh`)
+#   2. `SUDO_USER` (i.e. invocation via `sudo /opt/cmdb/bootstrap.sh` from a non-root account)
+# A direct-as-root invocation (root login shell, or `sudo -i` then re-run)
+# leaves both empty and would have silently used `root`, chown'ing
+# /opt/cmdb to root and wiring `docker login` against the wrong user.
+# Refuse that path explicitly.
+DEPLOY_USER="${DEPLOY_USER:-${SUDO_USER:-}}"
+if [[ -z "${DEPLOY_USER}" ]]; then
+  echo "[bootstrap] FAIL: cannot determine deploy user."
+  echo "[bootstrap]   - Invoke via sudo from the deploy account: 'sudo /opt/cmdb/bootstrap.sh'"
+  echo "[bootstrap]   - Or pass it explicitly: 'sudo DEPLOY_USER=ubuntu /opt/cmdb/bootstrap.sh'"
+  exit 1
+fi
+if ! id -u "${DEPLOY_USER}" >/dev/null 2>&1; then
+  echo "[bootstrap] FAIL: deploy user '${DEPLOY_USER}' does not exist on this host"
+  exit 1
+fi
+if [[ "${DEPLOY_USER}" == "root" ]]; then
+  echo "[bootstrap] FAIL: refusing to bootstrap with DEPLOY_USER=root."
+  echo "[bootstrap]   Create a non-root account (default: 'ubuntu') and re-run via sudo from there."
   exit 1
 fi
 
