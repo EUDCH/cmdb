@@ -7,7 +7,11 @@
 #   /opt/cmdb/deploy.sh <previous-sha>
 #
 # Per ADR-0004 the docker socket never leaves the VM; the workflow's only
-# remote action is `ssh ubuntu@cmdb-vm /opt/cmdb/deploy.sh <tag>`.
+# remote action is `ssh <deploy-user>@<deploy-host> /opt/cmdb/deploy.sh <tag>`,
+# where the user + host come from the `DEPLOY_USER` and `DEPLOY_HOST` repo
+# secrets (canonical values: `ubuntu` and `cmdb.edch.eu` for the
+# IN2P3 Strasbourg deployment). HANDOVER.md documents the matching local
+# `~/.ssh/config` alias (`cmdb-vm`) maintainers use for shorter commands.
 
 set -euo pipefail
 
@@ -76,6 +80,12 @@ if ! docker compose run --rm migrate; then
 fi
 
 echo "[deploy] migrate ok — swapping cmdb container"
+# Ensure the baseline services (caddy + postgres) are running BEFORE the
+# probe so the very first deploy on a freshly bootstrapped VM doesn't
+# time out trying to reach a Caddy that was never started. Idempotent on
+# subsequent deploys: containers with matching config are left in place.
+# `--no-deps cmdb` then surgically swaps just the app container.
+docker compose up -d caddy postgres
 docker compose up -d --no-deps cmdb
 
 # Poll /health via the public caddy listener so a TLS or vhost regression

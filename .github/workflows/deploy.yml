@@ -44,11 +44,26 @@ jobs:
       # ghcr.io/eudch/cmdb:<sha> tag with a freshly-built image from the
       # current `main` source tree, breaking the immutable-SHA contract
       # in ADR-0004 § Decision (rollback row).
+      #
+      # The `tag` input is free-form text and must NEVER be inlined
+      # directly into the shell `run:` body via `${{ … }}`: doing so
+      # lets the input string be parsed as shell, so an attacker who
+      # controlled the dispatch input could smuggle in command
+      # substitution (`$(...)`, backticks) that runs on the runner.
+      # Instead we route the value through `env:` (where it is treated
+      # as opaque data by bash) and validate it with the same regex
+      # deploy.sh enforces before letting it reach `$GITHUB_OUTPUT`.
       - name: Resolve deploy tag
         id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [[ -n "${{ github.event.inputs.tag }}" ]]; then
-            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${INPUT_TAG}" ]]; then
+            if [[ ! "${INPUT_TAG}" =~ ^(main|[a-f0-9]{7,40})$ ]]; then
+              echo "::error::Refusing tag '${INPUT_TAG}' — must be 'main' or 7..40-char lowercase hex SHA"
+              exit 1
+            fi
+            echo "value=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
             echo "is_rollback=true" >> "$GITHUB_OUTPUT"
           else
             echo "value=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
