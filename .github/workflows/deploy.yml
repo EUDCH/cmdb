@@ -75,7 +75,7 @@ jobs:
 
       - name: Login to GHCR
         if: steps.tag.outputs.is_rollback != 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
