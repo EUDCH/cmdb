@@ -3,8 +3,8 @@
  *
  * Pure resolvers + the security-critical `sanitizeNext` (open-redirect
  * prevention on the OIDC login flow's ?next= param). No infrastructure
- * needed; `getAuthMode` reads `import.meta.env.AUTH_MODE` which Bun
- * maps to `process.env` in test contexts.
+ * needed; `getAuthMode` reads `process.env.AUTH_MODE` directly so the
+ * tests just mutate `process.env` before each call.
  *
  * Not covered here (intentionally):
  * - getOidcConfig() — module-level cached Promise, harder to test in

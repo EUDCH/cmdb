@@ -3,8 +3,8 @@
  *
  * Pure functions; no infrastructure. Verifies the HMAC-signed cookie
  * round-trip and the tamper / expiry rejection paths. Sets
- * SESSION_SECRET via process.env before importing the module; Bun maps
- * `import.meta.env` to `process.env` in test contexts.
+ * SESSION_SECRET via process.env before importing the module; the
+ * module reads it via `process.env.SESSION_SECRET` at request time.
  *
  * Keep these tests focused on the security-critical paths (tampering,
  * expiration, malformed input) — round-trip alone would not catch a
