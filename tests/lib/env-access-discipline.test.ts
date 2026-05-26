@@ -77,11 +77,11 @@ describe("env access discipline (src/)", () => {
   test("never reads runtime config via import.meta.env.X", () => {
     const files = walkSourceFiles(SRC_ROOT);
     const violations: string[] = [];
-    const pattern = /import\.meta\.env\.[A-Za-z_][A-Za-z0-9_]*/g;
+    const pattern = /import\.meta\.env(?:\.[A-Za-z_][A-Za-z0-9_]*)?/g;
     for (const file of files) {
       const stripped = stripComments(readFileSync(file, "utf8"));
-      const matches = stripped.match(pattern);
-      if (!matches) continue;
+      const matches = Array.from(stripped.matchAll(pattern), (match) => match[0]);
+      if (matches.length === 0) continue;
       for (const m of matches) {
         if (ALLOWED_ACCESSES.has(m)) continue;
         violations.push(`${file.replace(SRC_ROOT, "src")}: ${m}`);
