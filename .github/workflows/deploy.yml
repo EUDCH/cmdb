@@ -70,7 +70,7 @@ jobs:
             echo "is_rollback=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
         if: steps.tag.outputs.is_rollback != 'true'
 
       - name: Login to GHCR
