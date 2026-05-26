@@ -16,10 +16,12 @@
  * is the catch: if anyone re-introduces `import.meta.env.X` in `src/`,
  * the suite turns red before the regression reaches a deployment.
  *
- * The two allowed forms — both Astro-provided, not user-defined env —
- * are intentionally listed by name rather than allowlisted by prefix
- * so that an accidental `import.meta.env.MY_NEW_SECRET` can't slip
- * through under a future `MODE`-shaped name.
+ * The allowed accessors — all Astro/Vite build-time built-ins, never
+ * user-defined env — are intentionally listed by name (see
+ * `ALLOWED_ACCESSES` below) rather than allowlisted by prefix, so that
+ * an accidental `import.meta.env.MY_NEW_SECRET` can't slip through
+ * under a future `MODE`-shaped name. Update the set when Astro adds a
+ * new built-in; never widen by prefix.
  */
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -28,10 +30,14 @@ import { join } from "node:path";
 const SRC_ROOT = join(import.meta.dir, "..", "..", "src");
 
 const ALLOWED_ACCESSES = new Set<string>([
-  // Astro built-ins. Both are computed by Vite from the build mode and
-  // are stable identifiers — DEV is true on `astro dev`, false on the
-  // production bundle; MODE is the literal mode string. Neither is a
-  // user-supplied secret, so build-time inlining is the intended behavior.
+  // Astro/Vite build-time built-ins. None is a user-supplied secret:
+  //   DEV / PROD — booleans inverted across `astro dev` vs the
+  //                production bundle
+  //   MODE       — the literal mode string (`development` / `production`)
+  //   SSR        — true on server-rendered code paths
+  //   BASE_URL   — the configured site base prefix (defaults to `/`)
+  // Build-time inlining is the intended semantic for these; the rule
+  // this test enforces only applies to runtime secrets / config.
   "import.meta.env.DEV",
   "import.meta.env.MODE",
   "import.meta.env.PROD",
@@ -39,13 +45,13 @@ const ALLOWED_ACCESSES = new Set<string>([
   "import.meta.env.BASE_URL",
 ]);
 
-function walkTsFiles(dir: string): string[] {
+function walkSourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
-      out.push(...walkTsFiles(full));
+      out.push(...walkSourceFiles(full));
     } else if (entry.endsWith(".ts") || entry.endsWith(".astro")) {
       out.push(full);
     }
@@ -69,7 +75,7 @@ function stripComments(src: string): string {
 
 describe("env access discipline (src/)", () => {
   test("never reads runtime config via import.meta.env.X", () => {
-    const files = walkTsFiles(SRC_ROOT);
+    const files = walkSourceFiles(SRC_ROOT);
     const violations: string[] = [];
     const pattern = /import\.meta\.env\.[A-Za-z_][A-Za-z0-9_]*/g;
     for (const file of files) {
