@@ -12,7 +12,8 @@ export interface Session {
 }
 
 function getSecret(): string {
-  const secret = import.meta.env.SESSION_SECRET;
+  // process.env, not import.meta.env — see comment in lib/db.ts for why.
+  const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
     throw new Error("SESSION_SECRET must be at least 32 bytes — see .env.example");
   }
