@@ -4,9 +4,10 @@
 #
 #   - `bun`  → keeps app/test deps in package.json + bun.lock fresh.
 #              Dependabot reads bun.lock natively (added 2025).
-#   - `github-actions` → keeps action pins in .github/workflows/ci.yml
-#              fresh (hadolint/hadolint-action, actions/checkout, etc.).
-#              These drift silently otherwise.
+#   - `github-actions` → keeps action pins in both workflow files
+#              (.github/workflows/ci.yml and deploy.yml) fresh: checkout,
+#              setup-bun, hadolint, docker/*, etc. `directory: "/"` scans
+#              every workflow, not just ci.yml. They drift silently otherwise.
 #
 # PRs land under `chore(deps)` (bun) and `chore(ci)` (gh-actions), get the
 # standard CI gates, and follow the same merge ceremony as any other PR
