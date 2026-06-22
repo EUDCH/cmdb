@@ -98,10 +98,12 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Configure SSH
-        # The deploy key is the only secret this workflow uses besides
-        # GITHUB_TOKEN. Pinned known_hosts prevents MITM on first connect.
-        # Secrets pass through env (opaque data to bash) and are written with
-        # printf, never interpolated into the run body as `${{ secrets.* }}`.
+        # Besides GITHUB_TOKEN, this workflow uses four deploy secrets:
+        # DEPLOY_SSH_KEY / DEPLOY_KNOWN_HOSTS here, and DEPLOY_USER /
+        # DEPLOY_HOST in the Deploy step. Pinned known_hosts prevents MITM on
+        # first connect. Secrets pass through env (opaque data to bash) and are
+        # written with printf, never interpolated into the run body as
+        # `${{ secrets.* }}`.
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
