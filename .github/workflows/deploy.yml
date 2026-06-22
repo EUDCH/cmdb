@@ -36,7 +36,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # When workflow_dispatch carries a non-empty `tag` input we treat
       # this as a rollback / redeploy of an existing image and SKIP the
