@@ -36,7 +36,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
       # When workflow_dispatch carries a non-empty `tag` input we treat
       # this as a rollback / redeploy of an existing image and SKIP the
@@ -70,12 +70,12 @@ jobs:
             echo "is_rollback=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4
         if: steps.tag.outputs.is_rollback != 'true'
 
       - name: Login to GHCR
         if: steps.tag.outputs.is_rollback != 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -83,7 +83,7 @@ jobs:
 
       - name: Build + push
         if: steps.tag.outputs.is_rollback != 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7
         with:
           context: .
           push: true
@@ -98,13 +98,20 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Configure SSH
-        # The deploy key is the only secret this workflow uses besides
-        # GITHUB_TOKEN. Pinned known_hosts prevents MITM on first connect.
+        # Besides GITHUB_TOKEN, this workflow uses four deploy secrets:
+        # DEPLOY_SSH_KEY / DEPLOY_KNOWN_HOSTS here, and DEPLOY_USER /
+        # DEPLOY_HOST in the Deploy step. Pinned known_hosts prevents MITM on
+        # first connect. Secrets pass through env (opaque data to bash) and are
+        # written with printf, never interpolated into the run body as
+        # `${{ secrets.* }}`.
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           install -d -m 0700 ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
           chmod 0600 ~/.ssh/id_deploy
-          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 0644 ~/.ssh/known_hosts
 
       - name: Deploy
@@ -114,10 +121,14 @@ jobs:
         # any pre-populated `~/.ssh/known_hosts` content (or the more
         # lenient `accept-new` default) and silently accept a different
         # host key, defeating the point of pinning.
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_TAG: ${{ steps.tag.outputs.value }}
         run: |
           ssh -i ~/.ssh/id_deploy \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile=~/.ssh/known_hosts \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            /opt/cmdb/deploy.sh "${{ steps.tag.outputs.value }}"
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            /opt/cmdb/deploy.sh "$DEPLOY_TAG"
