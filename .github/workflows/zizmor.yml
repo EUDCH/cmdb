@@ -1,0 +1,27 @@
+# Calls the org-shared reusable zizmor workflow (EUDCH/.github) to scan this
+# repo's GitHub Actions workflows for supply-chain and injection risks.
+# Pinned to a commit SHA, like every other action reference in this repo.
+# Findings land in this repo's Security tab (report-only during calibration).
+name: zizmor
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  zizmor:
+    # Skip on fork PRs: a pull_request from a fork gets a read-only
+    # GITHUB_TOKEN regardless of permissions:, so the SARIF upload
+    # (security-events: write) would 403 and fail the job. Pushes and
+    # same-repo PRs still run; a fork's workflow changes get scanned on
+    # push to main after merge.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    uses: EUDCH/.github/.github/workflows/zizmor.yml@f490ec47e62cdd43550291a657ecd916d1991df0  # EUDCH/.github#1
