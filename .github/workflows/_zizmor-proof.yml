@@ -1,0 +1,12 @@
+# Throwaway file to prove zizmor enforce blocks. DO NOT MERGE.
+name: zizmor enforce proof (do not merge)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "msg is ${{ github.event.head_commit.message }}"
