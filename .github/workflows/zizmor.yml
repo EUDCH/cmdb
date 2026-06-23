@@ -16,4 +16,12 @@ permissions:
 
 jobs:
   zizmor:
+    # Skip on fork PRs: a pull_request from a fork gets a read-only
+    # GITHUB_TOKEN regardless of permissions:, so the SARIF upload
+    # (security-events: write) would 403 and fail the job. Pushes and
+    # same-repo PRs still run; a fork's workflow changes get scanned on
+    # push to main after merge.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     uses: EUDCH/.github/.github/workflows/zizmor.yml@f490ec47e62cdd43550291a657ecd916d1991df0  # EUDCH/.github#1
