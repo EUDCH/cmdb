@@ -26,6 +26,10 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Europe/Paris"
+    # Minimum age before applying an update, to dodge a compromised fresh
+    # release (Shai-Hulud-style); gives the ecosystem time to catch it.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     commit-message:
       # `prefix` already carries the "deps" scope; do NOT add `include: "scope"`
@@ -78,6 +82,10 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Europe/Paris"
+    # Minimum age before applying an action bump, to dodge a compromised
+    # fresh release (tj-actions / Shai-Hulud-style).
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     commit-message:
       prefix: "chore(ci)"
