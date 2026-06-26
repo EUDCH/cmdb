@@ -26,10 +26,12 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Europe/Paris"
-    # Minimum age before applying an update, to dodge a compromised fresh
-    # release (Shai-Hulud-style); gives the ecosystem time to catch it.
+    # One-day cooldown so a same-day yanked or compromised release
+    # (Shai-Hulud-style) is not applied automatically. Security fixes arrive
+    # as separate Dependabot security updates and are not held by this gate.
+    # Matches the OPERAS Renovate release-age setting.
     cooldown:
-      default-days: 7
+      default-days: 1
     open-pull-requests-limit: 5
     commit-message:
       # `prefix` already carries the "deps" scope; do NOT add `include: "scope"`
@@ -82,10 +84,12 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Europe/Paris"
-    # Minimum age before applying an action bump, to dodge a compromised
-    # fresh release (tj-actions / Shai-Hulud-style).
+    # One-day cooldown so a same-day yanked or compromised action release
+    # (tj-actions / Shai-Hulud-style) is not applied automatically. Security
+    # fixes arrive as separate Dependabot security updates. Matches the OPERAS
+    # Renovate release-age setting.
     cooldown:
-      default-days: 7
+      default-days: 1
     open-pull-requests-limit: 3
     commit-message:
       prefix: "chore(ci)"
