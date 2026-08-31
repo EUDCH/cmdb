@@ -24,7 +24,7 @@
     "@astrojs/node": "^9.0.0",
     "astro": "^5.18.2",
     "drizzle-orm": "^0.45.2",
-    "openid-client": "^6.8.4",
+    "openid-client": "^6.8.7",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
