@@ -32,6 +32,9 @@ permissions:
 jobs:
   build-and-deploy:
     name: Build + push + deploy
+    # Forks inherit this workflow but cannot push to ghcr.io/eudch or
+    # reach the VM, so a fork's main push would only produce a red run.
+    if: github.repository == 'EUDCH/cmdb'
     runs-on: ubuntu-latest
     environment: production
 
