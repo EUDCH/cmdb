@@ -20,7 +20,7 @@
     "db:seed:local": "bun run db/seed.local.ts"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.4",
+    "@astrojs/check": "^0.9.10",
     "@astrojs/node": "^9.0.0",
     "astro": "^5.18.2",
     "drizzle-orm": "^0.45.2",
