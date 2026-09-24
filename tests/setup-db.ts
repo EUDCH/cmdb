@@ -11,9 +11,11 @@
  * demo data and will grow over time).
  *
  * Fixture: 1 owner, 3 services (one per relevant lifecycle state), 2 hosts,
- * 1 dependency. Adjust deliberately when a test needs new coverage; if you
- * find yourself adding rows just to make an assertion pass, the assertion
- * is testing the wrong thing.
+ * 1 dependency. Two of the three services carry `security_contacts` metadata
+ * (with an intentional overlap to exercise dedup); the third has NULL
+ * metadata to exercise the without-contacts path. Adjust deliberately when
+ * a test needs new coverage; if you find yourself adding rows just to make
+ * an assertion pass, the assertion is testing the wrong thing.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -97,8 +99,13 @@ if (!looksLikeTestDb && !explicitOverride) {
   process.exit(1);
 }
 
-// max: 1 — the migration uses raw BEGIN/COMMIT; postgres-js rejects those
-// with UNSAFE_TRANSACTION when pool size > 1.
+// max: 1 — applying migrations + fixture sequentially on a single connection
+// keeps ordering deterministic and matches the production runner's pool size
+// (db/migrate.ts uses max: 1 to keep transaction semantics simple). The
+// migration files themselves no longer carry top-level BEGIN/COMMIT (the
+// production runner wraps each file in `sql.begin(...)`); setup-db.ts here
+// applies them via `sql.unsafe(...)` autocommit, which is fine for the
+// idempotent DDL the schema uses.
 const sql = postgres(url, { max: 1, onnotice: () => {} });
 
 async function main() {
@@ -142,11 +149,17 @@ async function main() {
       ('33333333-3333-3333-3333-333333333331', 'edch', 'Test Alpha',
        'Production fixture service.', 'production',
        '11111111-1111-1111-1111-111111111111',
-       '{"component": "Forum & Registry"}'::jsonb),
+       '{"component": "Forum & Registry",
+         "security_contacts": ["alpha-security@example.invalid",
+                               "shared-security@example.invalid"],
+         "security_contacts_source": "default"}'::jsonb),
       ('33333333-3333-3333-3333-333333333332', 'edch', 'Test Bravo',
        'Staging fixture service.', 'staging',
        '11111111-1111-1111-1111-111111111111',
-       '{"component": "Diamond Discovery Hub"}'::jsonb),
+       '{"component": "Diamond Discovery Hub",
+         "security_contacts": ["bravo-security@example.invalid",
+                               "shared-security@example.invalid"],
+         "security_contacts_source": "vetted"}'::jsonb),
       ('33333333-3333-3333-3333-333333333333', 'edch', 'Test Charlie',
        'Planned fixture service, no component.', 'planned',
        '11111111-1111-1111-1111-111111111111', NULL)

@@ -1,0 +1,167 @@
+# OPERAS CMDB — production compose stack for cmdb.edch.eu (single VM).
+#
+# Per ADR-0004:
+#   - All services on a private bridge network
+#   - Postgres NOT published on the host network; only the app reaches it
+#     via the user-defined bridge
+#   - Migration is a one-shot service; the app waits on
+#     `service_completed_successfully` — failed migration blocks the swap
+#   - Real EDCH inventory loaded out-of-band via the profile-gated `seed`
+#     service (bind-mount of /opt/cmdb/seed.local.ts — never in git)
+#   - Caddy terminates TLS on-box; Postgres data + Caddy state live in
+#     named Docker volumes
+#
+# `IMAGE_TAG` is overridden by `/opt/cmdb/deploy.sh <tag>` so a deploy
+# pins to a specific GHCR digest. The local default of `main` lets a
+# bare `docker compose pull` keep a manual recovery path open.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: cmdb-caddy
+    restart: unless-stopped
+    # Caddy gets only the two vars it needs — DOMAIN for the vhost block,
+    # ACME_EMAIL for Let's Encrypt registration. The app's secrets
+    # (DB creds, SESSION_SECRET, GHCR_TOKEN, …) never enter this container.
+    # Values interpolate from /opt/cmdb/.env via compose's standard .env
+    # mechanism (same directory as this compose file).
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - /opt/cmdb/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # No `depends_on: cmdb` here on purpose: Caddy must stay independent
+    # so ACME renewals + TLS termination keep working even when the app
+    # is failing to start. Caddy will return 502 against the proxied
+    # /health while cmdb is down; the deploy script's auto-rollback path
+    # catches that case explicitly.
+    networks:
+      - cmdb_net
+
+  # Postgres receives only the three POSTGRES_* vars it needs — no shared
+  # env_file, so SESSION_SECRET / GHCR_TOKEN / OIDC_* never enter the DB
+  # container. Values interpolate from /opt/cmdb/.env via compose's
+  # standard same-dir mechanism.
+  postgres:
+    image: postgres:17-alpine
+    container_name: cmdb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cmdb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-cmdb}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cmdb} -d ${POSTGRES_DB:-cmdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - cmdb_net
+
+  # One-shot migrate runs to completion (`restart: "no"`). A failed
+  # migration stays visible — the app service's
+  # `service_completed_successfully` gate keeps the previous container
+  # serving until migrate succeeds. Only DATABASE_URL is needed; no
+  # shared env_file.
+  migrate:
+    image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
+    container_name: cmdb-migrate
+    restart: "no"
+    environment:
+      # DATABASE_URL is composed inline from POSTGRES_* so it cannot
+      # drift away from the credentials Postgres itself sees. The host
+      # part is the compose service name on the private bridge.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cmdb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cmdb}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["bun", "run", "db/migrate.ts"]
+    networks:
+      - cmdb_net
+
+  # The app container gets only the runtime vars it actually reads.
+  # GHCR_USER / GHCR_TOKEN stay on the VM host (consumed by bootstrap.sh
+  # for `docker login`) and never enter the public-facing container.
+  cmdb:
+    image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
+    container_name: cmdb-app
+    restart: unless-stopped
+    environment:
+      # HOST + PORT pin the Astro SSR server binding so Caddy's
+      # `reverse_proxy cmdb:4321` reaches the app inside the bridge
+      # network. The runtime image already ships ENV defaults of
+      # HOST=0.0.0.0 / PORT=4321; setting them again here makes the
+      # contract visible from this file alone, so a future image rebuild
+      # that drops the ENV defaults doesn't silently break the proxy.
+      HOST: 0.0.0.0
+      PORT: 4321
+      # DATABASE_URL is composed inline from POSTGRES_* so it cannot
+      # drift away from the credentials Postgres itself sees. The host
+      # part is the compose service name on the private bridge.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cmdb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cmdb}
+      AUTH_MODE: ${AUTH_MODE}
+      SESSION_SECRET: ${SESSION_SECRET}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      BUILD_SHA: ${IMAGE_TAG:-main}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - cmdb_net
+
+  # Profile-gated one-shot. Invoked only by an operator with a real
+  # /opt/cmdb/seed.local.ts file on the VM:
+  #
+  #   docker compose --profile seed run --rm seed
+  #
+  # Real EDCH inventory is never in git; the file is scp'd to the VM
+  # out-of-band and bind-mounted at runtime. Only DATABASE_URL is needed.
+  #
+  # The host file MUST be world-readable (mode 0644) so the container's
+  # `bun` user can read it across the host/container UID gap — see the
+  # comment in bootstrap.sh next to the placeholder write for the full
+  # rationale.
+  seed:
+    image: ghcr.io/eudch/cmdb:${IMAGE_TAG:-main}
+    profiles: ["seed"]
+    environment:
+      # DATABASE_URL is composed inline from POSTGRES_* so it cannot
+      # drift away from the credentials Postgres itself sees. The host
+      # part is the compose service name on the private bridge.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cmdb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cmdb}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - /opt/cmdb/seed.local.ts:/app/db/seed.local.ts:ro
+    command: ["bun", "run", "db/seed.local.ts"]
+    networks:
+      - cmdb_net
+
+volumes:
+  postgres_data:
+    name: cmdb_postgres_data
+  caddy_data:
+    name: cmdb_caddy_data
+  caddy_config:
+    name: cmdb_caddy_config
+
+networks:
+  cmdb_net:
+    name: cmdb_net
+    driver: bridge

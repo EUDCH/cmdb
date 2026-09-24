@@ -1,0 +1,136 @@
+name: Deploy
+
+# Phase 1 trigger per ADR-0004: every push to main ships. Phase 1.5 will
+# swap this to `release: { types: [published] }` once feature velocity
+# slows and stability matters more than freshness. workflow_dispatch
+# stays in both phases for manual rollbacks.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (default: current commit SHA)"
+        required: false
+        default: ""
+
+# Tag policy:
+#   - ghcr.io/eudch/cmdb:<commit-sha>  (immutable, pinned by deploy.sh)
+#   - ghcr.io/eudch/cmdb:main          (floating, last-good for manual recovery)
+#
+# A registry tag is never deleted — rollback to an arbitrary prior SHA
+# stays one `deploy.sh <sha>` invocation away.
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    name: Build + push + deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      # When workflow_dispatch carries a non-empty `tag` input we treat
+      # this as a rollback / redeploy of an existing image and SKIP the
+      # build+push entirely. Rebuilding would overwrite the historical
+      # ghcr.io/eudch/cmdb:<sha> tag with a freshly-built image from the
+      # current `main` source tree, breaking the immutable-SHA contract
+      # in ADR-0004 § Decision (rollback row).
+      #
+      # The `tag` input is free-form text and must NEVER be inlined
+      # directly into the shell `run:` body via `${{ … }}`: doing so
+      # lets the input string be parsed as shell, so an attacker who
+      # controlled the dispatch input could smuggle in command
+      # substitution (`$(...)`, backticks) that runs on the runner.
+      # Instead we route the value through `env:` (where it is treated
+      # as opaque data by bash) and validate it with the same regex
+      # deploy.sh enforces before letting it reach `$GITHUB_OUTPUT`.
+      - name: Resolve deploy tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [[ -n "${INPUT_TAG}" ]]; then
+            if [[ ! "${INPUT_TAG}" =~ ^(main|[a-f0-9]{7,40})$ ]]; then
+              echo "::error::Refusing tag '${INPUT_TAG}' — must be 'main' or 7..40-char lowercase hex SHA"
+              exit 1
+            fi
+            echo "value=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
+            echo "is_rollback=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "is_rollback=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4.1.0
+        if: steps.tag.outputs.is_rollback != 'true'
+
+      - name: Login to GHCR
+        if: steps.tag.outputs.is_rollback != 'true'
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push
+        if: steps.tag.outputs.is_rollback != 'true'
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/eudch/cmdb:${{ steps.tag.outputs.value }}
+            ghcr.io/eudch/cmdb:main
+          labels: |
+            org.opencontainers.image.source=https://github.com/EUDCH/cmdb
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Configure SSH
+        # Besides GITHUB_TOKEN, this workflow uses four deploy secrets:
+        # DEPLOY_SSH_KEY / DEPLOY_KNOWN_HOSTS here, and DEPLOY_USER /
+        # DEPLOY_HOST in the Deploy step. Pinned known_hosts prevents MITM on
+        # first connect. Secrets pass through env (opaque data to bash) and are
+        # written with printf, never interpolated into the run body as
+        # `${{ secrets.* }}`.
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 0600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 0644 ~/.ssh/known_hosts
+
+      - name: Deploy
+        # `StrictHostKeyChecking=yes` + an explicit `UserKnownHostsFile`
+        # pin host key checking to the file we just wrote from
+        # DEPLOY_KNOWN_HOSTS. Without these the runner could fall back to
+        # any pre-populated `~/.ssh/known_hosts` content (or the more
+        # lenient `accept-new` default) and silently accept a different
+        # host key, defeating the point of pinning.
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          ssh -i ~/.ssh/id_deploy \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            /opt/cmdb/deploy.sh "$DEPLOY_TAG"

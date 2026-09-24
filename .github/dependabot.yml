@@ -1,0 +1,94 @@
+# Dependabot — weekly dependency refresh PRs.
+#
+# Two ecosystems are tracked:
+#
+#   - `bun`  → keeps app/test deps in package.json + bun.lock fresh.
+#              Dependabot reads bun.lock natively (added 2025).
+#   - `github-actions` → keeps action pins in both workflow files
+#              (.github/workflows/ci.yml and deploy.yml) fresh: checkout,
+#              setup-bun, hadolint, docker/*, etc. `directory: "/"` scans
+#              every workflow, not just ci.yml. They drift silently otherwise.
+#
+# PRs land under `chore(deps)` (bun) and `chore(ci)` (gh-actions), get the
+# standard CI gates, and follow the same merge ceremony as any other PR
+# (AGENTS.md → Change ceremony). Maintainer reviews + merges; agents do
+# not self-merge Dependabot PRs.
+#
+# Grouping: related deps that always upgrade together (or break in
+# isolation) are grouped into single PRs to cut review noise. New groups
+# can be added when patterns emerge.
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    # Minimum age before applying an update, to dodge a compromised fresh
+    # release (Shai-Hulud-style); gives the ecosystem time to catch it.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      # `prefix` already carries the "deps" scope; do NOT add `include: "scope"`
+      # — Dependabot would then append the ecosystem name, producing malformed
+      # titles like `chore(deps)(bun): bump astro` (two scopes is not valid
+      # Conventional Commits). Single scope `chore(deps): bump astro …` matches
+      # the AGENTS.md ceremony.
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+    # Ignore semver-major bumps for deps that need deliberate, hand-driven
+    # migrations beyond a one-line bump. Dependabot otherwise re-opens the
+    # same broken PR every week, which is noise. Each ignore has a tracking
+    # issue with the migration plan; revert the ignore in the migration PR
+    # so future bumps come back online.
+    ignore:
+      # TypeScript 5 → 6: tsconfig.json uses `baseUrl` which is a deprecation
+      # error in TS 6 (silenced via `ignoreDeprecations: "6.0"` or removed
+      # since TS 4.1+ supports `paths` standalone). Tracked: #20.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Astro 5 → 6: hard-requires Node ≥ 22.12.0, but the GHA runner's PATH
+      # Node is 20 (Bun emulates 24 but Astro CLI reads the runner's Node).
+      # CI workflow needs an `actions/setup-node@v4` step before Bun. Also
+      # spans real breaking changes across the 5.x → 6.x window. Tracked:
+      # #21. `@astrojs/node@10` requires Astro 6.3+ — must migrate together.
+      - dependency-name: "astro"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@astrojs/check"
+        update-types: ["version-update:semver-major"]
+    groups:
+      astro:
+        patterns:
+          - "astro"
+          - "@astrojs/*"
+      drizzle:
+        patterns:
+          - "drizzle-orm"
+          - "drizzle-kit"
+      types:
+        patterns:
+          - "@types/*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    # Minimum age before applying an action bump, to dodge a compromised
+    # fresh release (tj-actions / Shai-Hulud-style).
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "ci"
+      - "dependencies"

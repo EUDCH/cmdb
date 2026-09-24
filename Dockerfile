@@ -44,6 +44,17 @@ RUN bun install --frozen-lockfile --production
 # Built Astro output (server entry + static assets + client islands).
 COPY --from=build /app/dist ./dist
 
+# Database tooling shipped alongside the app:
+#   - migrations/*.sql — applied by the one-shot `migrate` compose service
+#   - db/migrate.ts    — idempotent runner invoked as `bun run db/migrate.ts`
+#   - db/schema.ts     — drizzle schema (re-used by seed scripts at runtime)
+#   - tsconfig.json    — needed for the `~/`/`@db/` path aliases used by db/
+# db/seed.local.ts is bind-mounted at runtime via the seed compose profile;
+# the real EDCH inventory file is never present in the image itself.
+COPY --from=build /app/migrations ./migrations
+COPY --from=build /app/db ./db
+COPY --from=build /app/tsconfig.json ./tsconfig.json
+
 # Drop privileges. The oven/bun image ships a `bun` user.
 USER bun
 
