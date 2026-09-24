@@ -4,7 +4,7 @@
 # Stage 1 installs deps and builds the Astro standalone Node-adapter output.
 # Stage 2 ships only the runtime artefacts plus production dependencies.
 
-ARG BUN_VERSION=1.3
+ARG BUN_VERSION=1.4
 
 # ----------------------------------------------------------------------------
 # 1. Dependencies
