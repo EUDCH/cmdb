@@ -23,13 +23,13 @@
     "@astrojs/check": "^0.9.10",
     "@astrojs/node": "^9.0.0",
     "astro": "^5.18.2",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "openid-client": "^6.8.8",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^5.7.2"
   }
 }
